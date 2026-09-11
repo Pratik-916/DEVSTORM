@@ -73,6 +73,14 @@ const CashflowIntelligence = (() => {
     /* ---- Obligation Schedule (map to day buckets) ---- */
     const obligationsByDay = _mapObligationsToDays(payments, windowDays);
 
+    /* ---- Recurring Cashflow Patterns (Phase 11) ---- */
+    let recurringFlows = { unreservedExpenses: 0, totalExpectedIncome: 0, projectedExpenses: [], projectedIncome: [] };
+    if (typeof CashflowPatterns !== 'undefined' && typeof CashflowPatterns.getExpectedCashflows === 'function') {
+      recurringFlows = CashflowPatterns.getExpectedCashflows(windowDays);
+    }
+    const recurringExpensesByDay = _mapRecurringExpensesToDays(recurringFlows.projectedExpenses, windowDays);
+    const recurringIncomeByDay = _mapRecurringIncomeToDays(recurringFlows.projectedIncome, windowDays);
+
     /* ---- Daily Cash Projection ---- */
     const projection = _projectCash({
       startCash: availableCash,
@@ -81,6 +89,8 @@ const CashflowIntelligence = (() => {
       settlementT1,
       settlementT2,
       obligationsByDay,
+      recurringExpensesByDay,
+      recurringIncomeByDay,
       windowDays,
     });
 
@@ -88,24 +98,32 @@ const CashflowIntelligence = (() => {
     const projectedEndingCash = projection.values[windowDays - 1] || availableCash;
 
     /* ---- Expected Incoming Cash (window period) ---- */
-    const expectedIncoming = Math.round(avgDailyIncome * windowDays) + pendingSettlement;
+    const recurringIncomeTotal = (recurringFlows.totalExpectedIncome || 0);
+    const expectedIncoming = Math.round(avgDailyIncome * windowDays) + pendingSettlement + recurringIncomeTotal;
 
     /* ---- Expected Outgoing Cash (window period) ---- */
     const obligationsTotal = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
-    const expectedOutgoing = Math.round(avgDailyExpenses * windowDays) + obligationsTotal;
+    const unreservedRecurringExpenseTotal = (recurringFlows.unreservedExpenses || 0);
+    const expectedOutgoing = Math.round(avgDailyExpenses * windowDays) + obligationsTotal + unreservedRecurringExpenseTotal;
 
     /* ---- Cash Runway (days until cash hits minimum safe floor) ---- */
     const safeFloor = Math.max(500, Math.round(availableCash * 0.10)); // 10% of current or 500 minimum
     const netDailyBurn = avgDailyExpenses - avgDailyIncome;
     let cashRunwayDays;
-    if (netDailyBurn <= 0) {
+    if (netDailyBurn <= 0 && unreservedRecurringExpenseTotal === 0) {
       // Cash is growing or stable — runway is effectively unlimited (report 90+ days)
       cashRunwayDays = 90;
     } else {
-      cashRunwayDays = Math.max(0, Math.floor((availableCash - safeFloor) / netDailyBurn));
+      cashRunwayDays = Math.max(0, Math.floor((availableCash - safeFloor) / (netDailyBurn > 0 ? netDailyBurn : 1)));
     }
 
-    /* ---- Improved Safe to Spend ---- */
+    // If projection breaches safeFloor within the forecast window, adjust runway
+    const firstFloorIdx = projection.values.findIndex(v => v <= safeFloor);
+    if (firstFloorIdx > 0 && firstFloorIdx < cashRunwayDays) {
+      cashRunwayDays = firstFloorIdx;
+    }
+
+    /* ---- Improved Safe to Spend (Preserve existing established formula) ---- */
     const safetyBuffer = Math.round(availableCash * SAFETY_BUFFER_RATE);
     const essentialDue = payments
       .filter(p => p.priority === 'essential' || p.priority === 'high')
@@ -131,6 +149,11 @@ const CashflowIntelligence = (() => {
     const lowestIdx = projection.values.indexOf(lowestVal);
     const lowestLabel = labels[lowestIdx] || labels[0];
 
+    let safeToSpendExplanation = `Available cash (${fmt(availableCash)}) minus obligation reserve (${fmt(obligationReserve)}) and safety buffer (${fmt(safetyBuffer)})`;
+    if (unreservedRecurringExpenseTotal > 0) {
+      safeToSpendExplanation += `. Note: ${fmt(unreservedRecurringExpenseTotal)} of predictable recurring expenses is expected during the next ${windowDays} days.`;
+    }
+
     return {
       windowDays,
 
@@ -140,16 +163,20 @@ const CashflowIntelligence = (() => {
       totalSales,
       totalExpenses,
       upcomingObligations: obligationsTotal,
+      recurringExpensesExpected: unreservedRecurringExpenseTotal,
+      recurringIncomeExpected: recurringIncomeTotal,
 
       // Intelligence metrics
       avgDailyIncome,
       avgDailyExpenses,
+      netDailyBurn,
       expectedIncoming,
       expectedOutgoing,
       projectedEndingCash,
       cashRunwayDays,
       safeToSpend,
       safetyBuffer,
+      obligationReserve,
       cashHealth,
       daysCovered,
 
@@ -162,9 +189,9 @@ const CashflowIntelligence = (() => {
 
       // Explanation fields (for transparency)
       explanation: {
-        safeToSpend: `Available cash (${fmt(availableCash)}) minus obligation reserve (${fmt(obligationReserve)}) and safety buffer (${fmt(safetyBuffer)})`,
+        safeToSpend: safeToSpendExplanation,
         cashHealth: _explainCashHealth(cashHealth, availableCash, obligationsTotal, cashRunwayDays),
-        forecast: `Based on avg daily income of ${fmt(avgDailyIncome)} and avg daily expenses of ${fmt(avgDailyExpenses)} over ${daysCovered} days of data. Pending settlements of ${fmt(pendingSettlement)} expected T+1/T+2.`,
+        forecast: `Based on avg daily income of ${fmt(avgDailyIncome)} and avg daily expenses of ${fmt(avgDailyExpenses)} over ${daysCovered} days of data. Pending settlements of ${fmt(pendingSettlement)} expected T+1/T+2.${unreservedRecurringExpenseTotal > 0 ? ` Predictable recurring outflows of ${fmt(unreservedRecurringExpenseTotal)} factored in.` : ''}`,
         runway: cashRunwayDays >= 90
           ? 'Cash is growing or stable. No runway concern.'
           : `At current burn rate (${fmt(Math.round(netDailyBurn))}/day), cash will reach minimum floor in ~${cashRunwayDays} days.`,
@@ -279,11 +306,72 @@ const CashflowIntelligence = (() => {
   }
 
   /**
+   * Map unreserved recurring expenses to day buckets within the forecast window.
+   */
+  function _mapRecurringExpensesToDays(projectedExpenses, windowDays) {
+    const buckets = new Array(windowDays).fill(0);
+    if (!Array.isArray(projectedExpenses)) return buckets;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    projectedExpenses.forEach(p => {
+      // Do not double-count if already covered by an obligation!
+      if (p.is_covered_by_obligation) return;
+      // Only include high/medium confidence patterns for forecasting
+      if (p.confidence !== 'high' && p.confidence !== 'medium') return;
+      if (!p.next_expected_date) return;
+
+      const dueMs = new Date(p.next_expected_date).setHours(0, 0, 0, 0);
+      const diffDays = Math.round((dueMs - today.getTime()) / 86400000);
+      if (diffDays >= 0 && diffDays < windowDays) {
+        buckets[diffDays] += Number(p.average_amount) || 0;
+      }
+    });
+
+    return buckets;
+  }
+
+  /**
+   * Map recurring income to day buckets within the forecast window.
+   */
+  function _mapRecurringIncomeToDays(projectedIncome, windowDays) {
+    const buckets = new Array(windowDays).fill(0);
+    if (!Array.isArray(projectedIncome)) return buckets;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    projectedIncome.forEach(p => {
+      if (p.confidence !== 'high' && p.confidence !== 'medium') return;
+      if (!p.next_expected_date) return;
+
+      const dueMs = new Date(p.next_expected_date).setHours(0, 0, 0, 0);
+      const diffDays = Math.round((dueMs - today.getTime()) / 86400000);
+      if (diffDays >= 0 && diffDays < windowDays) {
+        buckets[diffDays] += Number(p.average_amount) || 0;
+      }
+    });
+
+    return buckets;
+  }
+
+  /**
    * Project daily running cash from start to windowDays.
    * Day 0 = today (current available cash).
-   * Each subsequent day adds estimated daily income and subtracts expenses + obligations.
+   * Each subsequent day adds estimated daily income, recurring inflows and subtracts expenses + obligations + recurring outflows.
    */
-  function _projectCash({ startCash, avgDailyIncome, avgDailyExpenses, settlementT1, settlementT2, obligationsByDay, windowDays }) {
+  function _projectCash({
+    startCash,
+    avgDailyIncome,
+    avgDailyExpenses,
+    settlementT1,
+    settlementT2,
+    obligationsByDay,
+    recurringExpensesByDay = [],
+    recurringIncomeByDay = [],
+    windowDays,
+  }) {
     const values = [];
     let running = startCash;
     const FLOOR = 500;
@@ -303,10 +391,16 @@ const CashflowIntelligence = (() => {
       // Scheduled obligation outflows
       const obligation = obligationsByDay[day] || 0;
 
+      // Unreserved predictable recurring expenses
+      const recurringExpense = (recurringExpensesByDay && recurringExpensesByDay[day]) || 0;
+
+      // Predictable recurring income
+      const recurringIncome = (recurringIncomeByDay && recurringIncomeByDay[day]) || 0;
+
       // Daily operating expenses
       const expenses = avgDailyExpenses;
 
-      running = running + dailyInflow + settlement - expenses - obligation;
+      running = running + dailyInflow + settlement + recurringIncome - expenses - obligation - recurringExpense;
       values.push(Math.max(FLOOR, Math.round(running)));
     }
 

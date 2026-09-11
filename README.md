@@ -275,7 +275,59 @@ Directly exposes mathematical formulas across core metrics:
 
 ---
 
-## 8. Local Development Setup
+## 8. Recurring Cashflow & Pattern Detection (Phase 11)
+
+Cashly includes a specialized pattern-detection engine (`js/patterns.js`, `CashflowPatterns`) designed to identify predictable recurring expenses, recurring income, and transaction anomalies from historical transaction records.
+
+> **Deterministic Guarantee**: Cashly uses deterministic historical pattern analysis. It does not currently use machine learning or external AI for financial pattern detection. Every pattern, frequency, and anomaly is derived from explainable mathematical rules.
+
+### How Recurring Transactions Are Detected
+1. **Description Normalization**: Dynamic transaction tokens, bank payment prefixes (`UPI/`, `UTR/`, `IMPS/`, `REF-`), POS auth codes, and calendar month tokens are stripped to reveal the underlying merchant or payee name.
+2. **Direction Separation**: Outflows (expenses/withdrawals) and inflows (sales) are clustered independently.
+3. **Evidence Requirement**:
+   - At least **2 occurrences** on **distinct dates** are strictly required.
+   - A single transaction is **never** classified as recurring.
+   - If insufficient history exists, Cashly returns no pattern and displays an informational low-data message.
+
+### Amount Tolerance
+- Recurring amounts often fluctuate due to utility consumption, minor supplier price adjustments, or taxes.
+- Cashly applies a documented **$\pm 20\%$ tolerance band** around the cluster's median amount.
+- Occurrences within this tolerance are considered part of the recurring series; transactions exceeding this tolerance are treated as separate non-recurring outlays.
+
+### Frequency Detection & Confidence
+Sequential date intervals between occurrences are calculated in days and classified into intuitive cycles:
+- **Weekly**: Median interval between 5 and 9 days (expected cycle: 7 days).
+- **Biweekly**: Median interval between 12 and 17 days (expected cycle: 14 days).
+- **Monthly**: Median interval between 25 and 35 days (expected cycle: 30 days).
+- **Custom**: For irregular recurring intervals (e.g. `every 10 days`).
+
+**Confidence Scoring**:
+- `High`: $\ge 3$ occurrences, interval variance $\le 5$ days, 100% of amounts within tolerance.
+- `Medium`: $\ge 2$ occurrences, interval variance $\le 10$ days.
+- `Low`: Wide interval dispersion or limited repetitions.
+
+### Transaction Anomaly Detection
+To protect micro-merchants from unexpected spikes without generating false alarms:
+- Flags expenses that are $\ge 2.5\times$ the historical average daily expense and $\ge \text{₹}1,500$.
+- Uses professional, non-judgmental language: *"Unusual expense"* or *"Transaction is higher than your normal pattern"*. Terms like "fraud" are never used.
+
+### Forecast Integration & Double-Counting Prevention
+- Predictable recurring expenses due within the 7-day or 30-day forecast window are projected forward.
+- **Double-Counting Prevention**: Before adding a forecasted recurring expense to future outflows, Cashly cross-references active obligations in `upcoming_obligations`. If an obligation with a matching title/category and similar amount ($\pm 25\%$) is due within 4 days, it is flagged as covered and **never counted twice**.
+- Unreserved recurring expenses are incorporated into `expectedOutgoing` and day-by-day cash trajectory.
+
+### Why Patterns Do Not Change Available Cash
+- **Available Cash is strictly liquid reality**: It represents actual settled currency in hand or verified in bank accounts.
+- Projected patterns are future expectations, not confirmed debits. Automatically deducting unbilled recurring expenses would distort daily operational liquidity.
+- Safe to Spend retains its proven Cashflow Engine calculation, augmenting it with an informational note: *"Note: ₹X of predictable recurring expenses is expected during the next N days."*
+
+### Limitations of Deterministic Pattern Detection
+- Requires at least 2 distinct historical entries with comparable descriptions to identify a recurring pattern.
+- Highly irregular or seasonal payments (e.g., annual insurance premiums or quarterly tax payments) require manual entry in `Upcoming Obligations`.
+
+---
+
+## 9. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -309,7 +361,7 @@ Directly exposes mathematical formulas across core metrics:
 
 ---
 
-## 9. Deployment (Vercel / Netlify)
+## 10. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -321,7 +373,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 10. Current Limitations
+## 11. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -329,6 +381,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 11. License
+## 12. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

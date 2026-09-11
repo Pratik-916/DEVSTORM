@@ -455,6 +455,9 @@ const AppState = (() => {
     if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') {
       Reports.renderMetrics();
     }
+    if (typeof CashflowPatterns !== 'undefined' && typeof CashflowPatterns.invalidateCache === 'function') {
+      CashflowPatterns.invalidateCache();
+    }
     if (typeof Advisor !== 'undefined' && typeof Advisor.render === 'function') {
       Advisor.render();
     }

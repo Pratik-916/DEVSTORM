@@ -160,10 +160,11 @@ const CashlyAdvisor = (() => {
 
     let runwayExplanation = 'Not enough data to calculate runway.';
     if (intel) {
-      if (intel.netDailyBurn <= 0) {
+      const burn = Number(intel.netDailyBurn);
+      if (isNaN(burn) || burn <= 0) {
         runwayExplanation = 'Current cash reserves are growing or stable. Runway exceeds 90 days under current daily income and expense rates.';
       } else {
-        runwayExplanation = `Current liquid cash covers approximately ${intel.cashRunwayDays} days at an average net cash outflow of ${fmt(intel.netDailyBurn)}/day.`;
+        runwayExplanation = `Current liquid cash covers approximately ${intel.cashRunwayDays} days at an average net cash outflow of ${fmt(burn)}/day.`;
       }
     }
 
@@ -472,6 +473,101 @@ const CashlyAdvisor = (() => {
       });
     }
 
+    // PHASE 11: RECURRING CASHFLOW PATTERNS & ANOMALY RULES
+    if (typeof CashflowPatterns !== 'undefined') {
+      const recExpenses = CashflowPatterns.getRecurringExpenses();
+      const recIncome = CashflowPatterns.getRecurringIncome();
+      const anomalies = CashflowPatterns.getAnomalies();
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // RULE 8 — RECURRING EXPENSE APPROACHING
+      const approachingExpense = recExpenses.find(pat => {
+        if (!pat.next_expected_date) return false;
+        const dueMs = new Date(pat.next_expected_date).getTime();
+        const diffDays = Math.round((dueMs - today.getTime()) / 86400000);
+        return diffDays >= 0 && diffDays <= 4;
+      });
+
+      if (approachingExpense) {
+        const isUrgent = approachingExpense.average_amount >= (availableCash * 0.7);
+        recs.push({
+          id: `rec_expense_approaching_${approachingExpense.id}`,
+          type: 'recurring_expense',
+          priority: isUrgent ? 'high' : 'medium',
+          severity: isUrgent ? 'risk' : 'caution',
+          icon: isUrgent ? iconRisk() : iconCaution(),
+          title: 'Recurring payment approaching',
+          message: `Your ${fmt(approachingExpense.average_amount)} ${approachingExpense.description} payment usually occurs around this date.`,
+          reason: `Detected recurring pattern repeating ${approachingExpense.frequency} across ${approachingExpense.occurrence_count} historical occurrences. Next expected: ${approachingExpense.next_expected_date}.`,
+          action: 'Keep enough settled cash available before the expected payment date.',
+          created_at: now,
+        });
+      }
+
+      // RULE 9 — RISING RECURRING COST
+      const risingExpense = recExpenses.find(pat => pat.is_increasing);
+      if (risingExpense) {
+        recs.push({
+          id: `rec_cost_increasing_${risingExpense.id}`,
+          type: 'rising_cost',
+          priority: 'medium',
+          severity: 'caution',
+          icon: iconTrend(),
+          title: 'Recurring cost is increasing',
+          message: `The average amount for "${risingExpense.description}" has increased compared with previous occurrences.`,
+          reason: `Latest occurrence was ${fmt(risingExpense.latest_amount)}, which is ${risingExpense.increase_percent}% higher than the previous baseline of ${fmt(risingExpense.previous_average)}.`,
+          action: 'Review whether the higher cost is expected or renegotiate terms with the provider.',
+          created_at: now,
+        });
+      }
+
+      // RULE 10 — EXPECTED RECURRING INCOME
+      const upcomingIncome = recIncome.find(pat => {
+        if (!pat.next_expected_date) return false;
+        const dueMs = new Date(pat.next_expected_date).getTime();
+        const diffDays = Math.round((dueMs - today.getTime()) / 86400000);
+        return diffDays >= 0 && diffDays <= 5;
+      });
+
+      if (upcomingIncome) {
+        recs.push({
+          id: `rec_income_expected_${upcomingIncome.id}`,
+          type: 'expected_income',
+          priority: 'low',
+          severity: 'healthy',
+          icon: iconHealthy(),
+          title: 'Expected incoming cash',
+          message: `Expected ~${fmt(upcomingIncome.average_amount)} from "${upcomingIncome.description}" around ${upcomingIncome.next_expected_date}.`,
+          reason: `A similar payment pattern has appeared repeatedly in your recent history (${upcomingIncome.frequency} frequency across ${upcomingIncome.occurrence_count} receipts).`,
+          action: 'Use expected income for planning, but do not treat it as available cash until settled.',
+          created_at: now,
+        });
+      }
+
+      // RULE 11 — UNUSUAL EXPENSE ANOMALY
+      if (anomalies.length > 0) {
+        const topAnom = anomalies[0];
+        // Only show if not already flagged as large single expense
+        const alreadyFlagged = recs.some(r => r.type === 'unusual_expense');
+        if (!alreadyFlagged) {
+          recs.push({
+            id: `rec_anomaly_${topAnom.id}`,
+            type: 'unusual_expense',
+            priority: 'medium',
+            severity: 'caution',
+            icon: iconCaution(),
+            title: 'Unusual expense',
+            message: `Transaction of ${fmt(topAnom.amount)} is higher than your normal pattern.`,
+            reason: topAnom.explanation,
+            action: 'Verify that this transaction is accurate and accounted for in your cash planning.',
+            created_at: now,
+          });
+        }
+      }
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({
@@ -768,6 +864,11 @@ const CashlyAdvisor = (() => {
           </p>
         </div>
       `;
+    }
+
+    // 6. Render Recurring Cashflow Patterns & Anomalies (Phase 11)
+    if (typeof CashflowPatterns !== 'undefined' && typeof CashflowPatterns.render === 'function') {
+      CashflowPatterns.render('insights-patterns-container');
     }
   }
 
