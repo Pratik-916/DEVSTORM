@@ -461,6 +461,9 @@ const AppState = (() => {
     if (typeof Admin !== 'undefined' && typeof Admin.render === 'function') {
       Admin.render();
     }
+    if (typeof AlertEngine !== 'undefined' && typeof AlertEngine.evaluate === 'function') {
+      AlertEngine.evaluate();
+    }
   }
 
   /* ---- Financial Accounts ---- */

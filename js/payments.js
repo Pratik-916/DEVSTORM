@@ -177,37 +177,73 @@ const Payments = (() => {
     document.body.style.overflow = '';
   }
 
+  function showFeedback(message) {
+    const existing = document.getElementById('payments-feedback-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'payments-feedback-toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0F172A;color:#F1F5F9;font-size:14px;font-weight:500;padding:10px 20px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:9999;font-family:Inter,sans-serif;pointer-events:none;';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
   async function saveEdit() {
-    const id = document.getElementById('edit-ob-id').value;
-    const title = document.getElementById('edit-ob-title').value.trim();
-    const amount = parseFloat(document.getElementById('edit-ob-amount').value) || 0;
-    const dueDate = document.getElementById('edit-ob-due-date').value;
-    const status = document.getElementById('edit-ob-status').value;
+    const id = document.getElementById('edit-ob-id')?.value;
+    const titleInput = document.getElementById('edit-ob-title');
+    const amountInput = document.getElementById('edit-ob-amount');
+    const dueDateInput = document.getElementById('edit-ob-due-date');
+    const statusSelect = document.getElementById('edit-ob-status');
+
+    const title = titleInput?.value.trim();
+    const rawAmount = amountInput?.value ? Number(amountInput.value) : 0;
+    const dueDate = dueDateInput?.value;
+    const status = statusSelect?.value || 'due';
 
     if (!title) {
-      alert('Please enter an obligation title.');
+      titleInput?.focus();
+      showFeedback('Please enter an obligation title');
       return;
     }
-    if (amount <= 0) {
-      alert('Please enter a valid amount.');
+    if (isNaN(rawAmount) || !isFinite(rawAmount) || rawAmount <= 0) {
+      amountInput?.focus();
+      showFeedback('Please enter a valid amount greater than zero');
       return;
     }
 
-    if (typeof AppState !== 'undefined') {
-      await AppState.updatePayment(id, {
-        title,
-        amount,
-        dueDate: dueDate || new Date().toISOString().slice(0, 10),
-        status,
-      });
+    const saveBtn = document.querySelector('#obligation-edit-modal .modal-footer .btn-primary');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
     }
-    closeEdit();
+
+    try {
+      if (typeof AppState !== 'undefined') {
+        await AppState.updatePayment(id, {
+          title,
+          amount: rawAmount,
+          dueDate: dueDate || new Date().toISOString().slice(0, 10),
+          status,
+        });
+      }
+      showFeedback('Obligation updated');
+      closeEdit();
+    } catch (err) {
+      console.warn('[Cashly] Error updating obligation:', err);
+      showFeedback('Unable to update obligation. Please try again.');
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+      }
+    }
   }
 
   async function deleteObligation(id) {
     if (confirm('Are you sure you want to delete this upcoming obligation?')) {
       if (typeof AppState !== 'undefined') {
         await AppState.deletePayment(id);
+        showFeedback('Obligation deleted');
       }
     }
   }

@@ -171,59 +171,101 @@ const Admin = (() => {
     if (modal) modal.classList.remove('open');
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     if (e) e.preventDefault();
     if (typeof AppState === 'undefined') return;
 
     const id = document.getElementById('admin-edit-id').value;
     const desc = document.getElementById('admin-field-desc').value.trim();
-    const amount = parseFloat(document.getElementById('admin-field-amount').value) || 0;
-    const type = document.getElementById('admin-field-type').value;
-    const method = document.getElementById('admin-field-method').value;
-    const source = document.getElementById('admin-field-source').value;
-    const settlement = document.getElementById('admin-field-settlement').value;
-    const channel = document.getElementById('admin-field-channel').value.trim() || 'Counter Cash';
-    const date = document.getElementById('admin-field-date').value || new Date().toISOString().slice(0, 10);
+    const amountInput = document.getElementById('admin-field-amount');
+    const rawAmount = amountInput?.value ? Number(amountInput.value) : 0;
+    const type = document.getElementById('admin-field-type')?.value || 'sale';
+    const method = document.getElementById('admin-field-method')?.value || 'cash';
+    const source = document.getElementById('admin-field-source')?.value || 'manual';
+    const settlement = document.getElementById('admin-field-settlement')?.value || 'settled';
+    const channel = document.getElementById('admin-field-channel')?.value.trim() || 'Counter Cash';
+    const dateInput = document.getElementById('admin-field-date');
+    const date = dateInput?.value || new Date().toISOString().slice(0, 10);
 
-    if (amount <= 0) {
-      alert('Please enter a valid amount greater than zero.');
+    if (isNaN(rawAmount) || !isFinite(rawAmount) || rawAmount <= 0) {
+      amountInput?.focus();
+      showToast('Please enter a valid amount greater than zero');
       return;
     }
 
-    if (id) {
-      // Update existing
-      AppState.updateTransaction(id, {
-        description: desc || (type === 'expense' ? 'Expense' : 'Sale'),
-        amount: amount,
-        type: type,
-        paymentMethod: method,
-        source: source,
-        settlementStatus: settlement,
-        channel: channel,
-        date: date,
-      });
-    } else {
-      // Add new
-      AppState.addTransaction({
-        description: desc || (type === 'expense' ? 'Expense' : 'Sale'),
-        amount: amount,
-        type: type,
-        paymentMethod: method,
-        source: source,
-        settlementStatus: settlement,
-        channel: channel,
-        date: date,
-      });
+    if (date) {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) {
+        dateInput?.focus();
+        showToast('Please enter a valid date');
+        return;
+      }
     }
 
-    closeModal();
-    render();
+    const saveBtn = document.getElementById('admin-btn-save');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+    }
+
+    try {
+      if (id) {
+        // Update existing
+        await AppState.updateTransaction(id, {
+          description: desc || (type === 'expense' ? 'Expense' : 'Sale'),
+          amount: rawAmount,
+          type: type,
+          paymentMethod: method,
+          source: source,
+          settlementStatus: settlement,
+          channel: channel,
+          date: date,
+        });
+        showToast('Transaction updated');
+      } else {
+        // Add new
+        await AppState.addTransaction({
+          description: desc || (type === 'expense' ? 'Expense' : 'Sale'),
+          amount: rawAmount,
+          type: type,
+          paymentMethod: method,
+          source: source,
+          settlementStatus: settlement,
+          channel: channel,
+          date: date,
+        });
+        showToast('Transaction added');
+      }
+
+      closeModal();
+      render();
+    } catch (err) {
+      console.warn('[Cashly] Admin save transaction error:', err);
+      showToast('Unable to save transaction. Please try again.');
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Transaction';
+      }
+    }
   }
 
-  function deleteRecord(id) {
+  function showToast(message) {
+    const existing = document.getElementById('admin-feedback-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'admin-feedback-toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0F172A;color:#F1F5F9;font-size:14px;font-weight:500;padding:10px 20px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:9999;font-family:Inter,sans-serif;pointer-events:none;';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
+  async function deleteRecord(id) {
     if (!id || typeof AppState === 'undefined') return;
     if (confirm(`Are you sure you want to delete transaction ${id}?`)) {
-      AppState.deleteTransaction(id);
+      await AppState.deleteTransaction(id);
+      showToast('Transaction deleted');
       render();
     }
   }

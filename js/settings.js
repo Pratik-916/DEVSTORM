@@ -162,34 +162,68 @@ const Settings = (() => {
     document.body.style.overflow = '';
   }
 
+  function showFeedback(message) {
+    const existing = document.getElementById('settings-feedback-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'settings-feedback-toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0F172A;color:#F1F5F9;font-size:14px;font-weight:500;padding:10px 20px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:9999;font-family:Inter,sans-serif;pointer-events:none;';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
   async function saveAccount() {
-    const id = document.getElementById('account-modal-id').value;
-    const name = document.getElementById('account-modal-name').value.trim();
-    const type = document.getElementById('account-modal-type').value;
-    const provider = document.getElementById('account-modal-provider').value.trim() || name;
-    const status = document.getElementById('account-modal-status').value;
+    const id = document.getElementById('account-modal-id')?.value;
+    const nameInput = document.getElementById('account-modal-name');
+    const name = nameInput?.value.trim();
+    const typeSelect = document.getElementById('account-modal-type');
+    const rawType = typeSelect?.value || 'Bank';
+    const allowedTypes = ['Bank', 'UPI', 'Card', 'Cash', 'Credit'];
+    const type = allowedTypes.includes(rawType) ? rawType : 'Bank';
+    const provider = document.getElementById('account-modal-provider')?.value.trim() || name;
+    const status = document.getElementById('account-modal-status')?.value || 'connected';
 
     if (!name) {
-      alert('Please enter an account name.');
+      nameInput?.focus();
+      showFeedback('Please enter an account name');
       return;
     }
 
-    if (typeof AppState !== 'undefined') {
-      if (id) {
-        await AppState.updateFinancialAccount(id, { name, type, provider, status });
-      } else {
-        await AppState.addFinancialAccount({ name, type, provider, status });
-      }
+    const saveBtn = document.querySelector('#settings-account-modal .modal-footer .btn-primary');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
     }
 
-    closeAccountModal();
-    renderAccounts();
+    try {
+      if (typeof AppState !== 'undefined') {
+        if (id) {
+          await AppState.updateFinancialAccount(id, { name, type, provider, status });
+          showFeedback('Account updated');
+        } else {
+          await AppState.addFinancialAccount({ name, type, provider, status });
+          showFeedback('Account added');
+        }
+      }
+      closeAccountModal();
+      renderAccounts();
+    } catch (err) {
+      console.warn('[Cashly] Error saving financial account:', err);
+      showFeedback('Unable to save account. Please try again.');
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Account';
+      }
+    }
   }
 
   async function removeAccount(id) {
     if (confirm('Are you sure you want to remove this financial account?')) {
       if (typeof AppState !== 'undefined') {
         await AppState.deleteFinancialAccount(id);
+        showFeedback('Account removed');
       }
       renderAccounts();
     }

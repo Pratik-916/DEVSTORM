@@ -311,19 +311,34 @@ const AddTransaction = (() => {
   }
 
   /** Handle form submission — save to AppState, refresh UI, close */
-  function handleSubmit() {
+  async function handleSubmit() {
     const currentType = formScreen?.dataset.currentType || 'sale';
+    const submitBtn = document.getElementById('btn-add-transaction-submit');
 
     // Validate amount
     const amountInput = document.getElementById('txn-amount');
-    const amount = parseFloat(amountInput?.value) || 0;
-    if (amount <= 0) {
+    const rawAmount = amountInput?.value ? Number(amountInput.value) : 0;
+    if (isNaN(rawAmount) || !isFinite(rawAmount) || rawAmount <= 0) {
       amountInput?.focus();
-      amountInput?.style && (amountInput.style.borderColor = '#EF4444');
+      if (amountInput?.style) amountInput.style.borderColor = '#EF4444';
+      showSuccess('Please enter a valid amount greater than zero');
       setTimeout(() => {
         if (amountInput) amountInput.style.borderColor = '';
       }, 1500);
       return;
+    }
+
+    // Validate obligation due date if type is payment
+    if (currentType === 'payment') {
+      const dueDateInput = document.getElementById('txn-due-date');
+      if (dueDateInput && dueDateInput.value) {
+        const d = new Date(dueDateInput.value);
+        if (isNaN(d.getTime())) {
+          dueDateInput.focus();
+          showSuccess('Please enter a valid due date');
+          return;
+        }
+      }
     }
 
     if (typeof AppState === 'undefined') {
@@ -331,31 +346,45 @@ const AddTransaction = (() => {
       return;
     }
 
-    if (currentType === 'payment') {
-      // Save upcoming payment
-      const data = collectPaymentData();
-      AppState.addPayment(data);
-      if (typeof AppState.refreshAllViews === 'function') {
-        AppState.refreshAllViews();
-      }
-      showSuccess('Upcoming obligation added');
-    } else {
-      // Save transaction (cash sale, cash expense, withdrawal)
-      const data = collectFormData();
-      AppState.addTransaction(data);
-
-      if (typeof AppState.refreshAllViews === 'function') {
-        AppState.refreshAllViews();
-      } else {
-        if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') Transactions.render();
-        if (typeof Dashboard !== 'undefined' && typeof Dashboard.renderSummary === 'function') Dashboard.renderSummary();
-        if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') Reports.renderMetrics();
-      }
-
-      showSuccess(currentType === 'withdrawal' ? 'Personal withdrawal recorded' : 'Transaction recorded');
+    // Prevent double submission
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.dataset.originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Saving...';
     }
 
-    close();
+    try {
+      if (currentType === 'payment') {
+        const data = collectPaymentData();
+        await AppState.addPayment(data);
+        if (typeof AppState.refreshAllViews === 'function') {
+          AppState.refreshAllViews();
+        }
+        showSuccess('Upcoming obligation added');
+      } else {
+        const data = collectFormData();
+        await AppState.addTransaction(data);
+
+        if (typeof AppState.refreshAllViews === 'function') {
+          AppState.refreshAllViews();
+        } else {
+          if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') Transactions.render();
+          if (typeof Dashboard !== 'undefined' && typeof Dashboard.renderSummary === 'function') Dashboard.renderSummary();
+          if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') Reports.renderMetrics();
+        }
+
+        showSuccess(currentType === 'withdrawal' ? 'Personal withdrawal recorded' : 'Transaction recorded');
+      }
+      close();
+    } catch (err) {
+      console.warn('[Cashly] Error saving transaction:', err);
+      showSuccess('Unable to save transaction. Please try again.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = submitBtn.dataset.originalText || 'Add Transaction';
+      }
+    }
   }
 
   return { init, open, close };

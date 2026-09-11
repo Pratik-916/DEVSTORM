@@ -1,7 +1,8 @@
 -- ============================================================
--- CASHLY — SUPABASE DATABASE SCHEMA (PHASE 1)
--- Core PostgreSQL Tables, Foreign Keys, Indexes & RLS Setup
+-- CASHLY — CONSOLIDATED PRODUCTION SUPABASE DATABASE SCHEMA
+-- Core PostgreSQL Tables, Foreign Keys, Performance Indexes & RLS Setup
 -- Run this script in the Supabase SQL Editor (Dashboard -> SQL Editor)
+-- Safe to run more than once (uses IF NOT EXISTS / DROP IF EXISTS)
 -- ============================================================
 
 -- 1. BUSINESSES TABLE
@@ -32,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- If transactions table already exists, alter to add columns if missing
+-- If transactions table already exists, ensure required columns exist
 ALTER TABLE public.transactions 
 ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES public.businesses(id) ON DELETE CASCADE;
 
@@ -63,6 +64,19 @@ CREATE TABLE IF NOT EXISTS public.upcoming_obligations (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 5. ALERTS TABLE
+-- Stores proactive cashflow warnings & notifications linked to business, protected by RLS.
+CREATE TABLE IF NOT EXISTS public.alerts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'caution' CHECK (severity IN ('risk', 'caution', 'healthy')),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================
 -- PERFORMANCE INDEXES
 -- ============================================================
@@ -73,6 +87,9 @@ CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions (transac
 CREATE INDEX IF NOT EXISTS idx_financial_accounts_business_id ON public.financial_accounts (business_id);
 CREATE INDEX IF NOT EXISTS idx_upcoming_obligations_business_id ON public.upcoming_obligations (business_id);
 CREATE INDEX IF NOT EXISTS idx_upcoming_obligations_due_date ON public.upcoming_obligations (due_date ASC);
+CREATE INDEX IF NOT EXISTS idx_alerts_business_id ON public.alerts (business_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON public.alerts (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_business_unread ON public.alerts (business_id, is_read, created_at DESC);
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS) PREPARATION & POLICIES
@@ -81,6 +98,7 @@ ALTER TABLE public.businesses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.financial_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.upcoming_obligations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
 
 -- 1. Businesses Policies
 DROP POLICY IF EXISTS "Owners can manage own businesses" ON public.businesses;
@@ -91,7 +109,7 @@ TO authenticated
 USING (auth.uid() = owner_id)
 WITH CHECK (auth.uid() = owner_id);
 
--- 2. Transactions Policies (supports both business_id ownership and user_id fallback)
+-- 2. Transactions Policies (supports business_id ownership with user_id fallback)
 DROP POLICY IF EXISTS "Users can select own transactions" ON public.transactions;
 DROP POLICY IF EXISTS "Users can insert own transactions" ON public.transactions;
 DROP POLICY IF EXISTS "Users can update own transactions" ON public.transactions;
@@ -150,6 +168,15 @@ WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = au
 DROP POLICY IF EXISTS "Owners can manage upcoming obligations" ON public.upcoming_obligations;
 CREATE POLICY "Owners can manage upcoming obligations"
 ON public.upcoming_obligations
+FOR ALL
+TO authenticated
+USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))
+WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()));
+
+-- 5. Alerts Policies
+DROP POLICY IF EXISTS "Owners can manage own alerts" ON public.alerts;
+CREATE POLICY "Owners can manage own alerts"
+ON public.alerts
 FOR ALL
 TO authenticated
 USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))

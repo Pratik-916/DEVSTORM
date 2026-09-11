@@ -9,6 +9,13 @@
   <meta name="theme-color" content="#16A34A" />
   <title>Cashly — Know your cash. Make smarter moves.</title>
 
+  <!-- PWA Manifest & Icons -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Cashly" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
   <!-- Design Tokens first, then cascade -->
   <link rel="stylesheet" href="css/tokens.css" />
   <link rel="stylesheet" href="css/base.css" />
@@ -269,38 +276,25 @@
             Add
           </button>
 
-          <!-- Notifications -->
+          <!-- Notifications / Alert Center -->
           <div class="dropdown">
             <button class="icon-btn dropdown-toggle" id="btn-notifications" aria-label="Notifications"
-              aria-haspopup="true">
+              aria-haspopup="true" aria-expanded="false">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                 aria-hidden="true">
                 <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
                 <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
               </svg>
-              <span class="notif-dot" aria-label="3 unread notifications"></span>
+              <span class="notif-dot" style="display:none;" aria-label="0 unread notifications"></span>
             </button>
-            <div class="dropdown-menu notif-dropdown" role="menu" aria-label="Notifications">
+            <div class="dropdown-menu notif-dropdown" id="notif-dropdown" role="menu" aria-label="Notifications">
               <div class="notif-header">
-                <span>Notifications</span>
-                <button class="btn btn-ghost btn-sm" style="font-size:11px; padding:4px 8px;">Mark all read</button>
+                <span>Alerts &amp; Notifications</span>
+                <button class="btn btn-ghost btn-sm" id="btn-notif-mark-all" style="font-size:11px; padding:4px 8px;">Mark all read</button>
               </div>
-              <div class="divider" style="margin:4px 0;"></div>
-              <div class="notif-item" role="menuitem">
-                <div class="notif-item-title">Supplier Payment Due Tomorrow</div>
-                <div class="notif-item-body">&#8377;3,000 due to supplier. Ensure funds are available.</div>
-                <div class="notif-item-time">2 hours ago</div>
-              </div>
-              <div class="notif-item" role="menuitem">
-                <div class="notif-item-title">Pending Settlement Update</div>
-                <div class="notif-item-body">&#8377;7,800 from UPI / Cards is still pending.</div>
-                <div class="notif-item-time">Yesterday</div>
-              </div>
-              <div class="notif-item" role="menuitem">
-                <div class="notif-item-title">Cash Position Alert</div>
-                <div class="notif-item-body">Your available cash is approaching upcoming obligations.</div>
-                <div class="notif-item-time">2 days ago</div>
+              <div id="notif-list-container" class="notif-list-container" role="region" aria-live="polite">
+                <!-- Populated dynamically by AlertEngine -->
               </div>
             </div>
           </div>
@@ -2038,6 +2032,8 @@
   <script src="js/settings.js"></script>
   <script src="js/advisor.js"></script>
   <script src="js/admin.js"></script>
+  <!-- Cashflow Alert Engine (Phase 7) -->
+  <script src="js/alerts.js"></script>
   <script src="js/auth.js"></script>
 
   <!-- Init toggle switch thumbs (ensure thumb element exists in all toggles) -->
@@ -2049,6 +2045,21 @@
         sw.appendChild(thumb);
       }
     });
+  </script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function (reg) {
+            console.log('[Cashly] Service Worker registered with scope:', reg.scope);
+          })
+          .catch(function (err) {
+            console.warn('[Cashly] Service Worker registration failed:', err);
+          });
+      });
+    }
   </script>
 
 </body>

@@ -28,9 +28,10 @@ const Reports = (() => {
     setText('report-available-cash',    fmt(s.availableCash));
     setText('report-pending-money',     fmt(s.pendingSettlement));
 
-    // Net position (Sales - Expenses)
+    // Net position (Sales - Expenses) — genuine negative value if expenses exceed sales
     const net = s.totalSales - s.totalExpenses;
-    setText('report-net-position', fmt(Math.max(0, net)));
+    const formattedNet = net < 0 ? ('-' + fmt(Math.abs(net))) : fmt(net);
+    setText('report-net-position', formattedNet);
 
     // Cash conversion %
     const conversion = s.totalSales > 0

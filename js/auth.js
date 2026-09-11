@@ -115,6 +115,15 @@ const Auth = (() => {
         }
 
         AppState.init();
+
+        // Refresh alerts for this business
+        if (typeof AlertEngine !== 'undefined') {
+          AlertEngine.refresh().then(() => {
+            AlertEngine.evaluate();
+          }).catch(err => {
+            console.warn('[Cashly] Notice loading alerts on login:', err);
+          });
+        }
       }
 
       // Update user email on settings page
@@ -239,6 +248,20 @@ const Auth = (() => {
       if (typeof AppState !== 'undefined') {
         AppState.reset();
       }
+      if (typeof AlertEngine !== 'undefined') {
+        AlertEngine.clear();
+      }
+      if (typeof DigitalFeedProvider !== 'undefined' && typeof DigitalFeedProvider.setConnected === 'function') {
+        DigitalFeedProvider.setConnected(false);
+      }
+      // Clear UI labels so no private data remains visible
+      document.querySelectorAll('.business-name').forEach(el => {
+        el.textContent = 'Demo Shop';
+      });
+      const settingsEmail = document.getElementById('settings-user-email');
+      if (settingsEmail) settingsEmail.textContent = '';
+      const bizEmailEl = document.getElementById('header-user-email');
+      if (bizEmailEl) bizEmailEl.textContent = '';
     } catch (e) {
       console.warn('[Cashly] Notice during logout:', e);
     }

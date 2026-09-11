@@ -1171,6 +1171,155 @@ const SupabaseService = (() => {
     }
   }
 
+  /* ============================================================
+     ALERTS CRUD METHODS (Phase 7)
+     ============================================================ */
+
+  /**
+   * Fetch all alerts for the current business, newest first.
+   * @returns {Array|null} array of alert objects or null on failure
+   */
+  async function fetchAlerts() {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    const biz = getCurrentBusiness();
+    if (!biz || !biz.id) return null;
+
+    try {
+      const { data, error } = await _client
+        .from('alerts')
+        .select('*')
+        .eq('business_id', biz.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('[Cashly] Notice fetching alerts from Supabase:', error.message || error);
+        return null;
+      }
+      return data || [];
+    } catch (err) {
+      console.warn('[Cashly] Notice fetching alerts from Supabase:', err.message || err);
+      return null;
+    }
+  }
+
+  /**
+   * Insert a new alert for the current business.
+   * @param {Object} alert - { type, severity, title, message }
+   * @returns {Object|false} inserted row or false on failure
+   */
+  async function insertAlert(alert) {
+    await ensureConnected();
+    if (!isConnected()) return false;
+
+    const biz = getCurrentBusiness();
+    if (!biz || !biz.id) return false;
+
+    try {
+      const row = {
+        business_id: biz.id,
+        type: alert.type,
+        severity: alert.severity || 'caution',
+        title: alert.title,
+        message: alert.message,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+      const { data, error } = await _client.from('alerts').insert([row]);
+      if (error) {
+        console.warn('[Cashly] Notice inserting alert in Supabase:', error.message || error);
+        return false;
+      }
+      return (data && data[0]) ? data[0] : row;
+    } catch (err) {
+      console.warn('[Cashly] Notice inserting alert in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  /**
+   * Mark a single alert as read.
+   * @param {string} id - UUID of the alert
+   * @returns {boolean}
+   */
+  async function markAlertRead(id) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const { error } = await _client
+        .from('alerts')
+        .update({ is_read: true })
+        .eq('id', id);
+
+      if (error) {
+        console.warn('[Cashly] Notice marking alert read in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice marking alert read in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  /**
+   * Mark all unread alerts for the current business as read.
+   * Only updates alerts where is_read is currently false.
+   * @returns {boolean}
+   */
+  async function markAllAlertsRead() {
+    await ensureConnected();
+    if (!isConnected()) return false;
+
+    const biz = getCurrentBusiness();
+    if (!biz || !biz.id) return false;
+
+    try {
+      const { error } = await _client
+        .from('alerts')
+        .update({ is_read: true })
+        .eq('business_id', biz.id)
+        .eq('is_read', false);
+
+      if (error) {
+        console.warn('[Cashly] Notice marking all alerts read in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice marking all alerts read in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  /**
+   * Delete a single alert by ID.
+   * @param {string} id - UUID of the alert
+   * @returns {boolean}
+   */
+  async function deleteAlert(id) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const { error } = await _client
+        .from('alerts')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.warn('[Cashly] Notice deleting alert from Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice deleting alert from Supabase:', err.message || err);
+      return false;
+    }
+  }
+
   return {
     init,
     ensureConnected,
@@ -1197,5 +1346,12 @@ const SupabaseService = (() => {
     insertObligation,
     updateObligation,
     deleteObligation,
+    // Phase 7: Alerts
+    fetchAlerts,
+    insertAlert,
+    markAlertRead,
+    markAllAlertsRead,
+    deleteAlert,
   };
 })();
+
