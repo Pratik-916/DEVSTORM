@@ -254,140 +254,21 @@ const FORECAST_DATA = {
 };
 
 /* ----------------------------------------------------------
-   DIGITAL FEED PROVIDER (MOCK INTERFACE)
-   Simulates automatic transaction feeds from UPI, Card, Bank, Credit.
+   FINANCIAL DATA PROVIDER INTEGRATION
+   (Decoupled provider layer implemented in js/provider.js)
    ---------------------------------------------------------- */
-const DigitalFeedProvider = (() => {
-  let _isAccountConnected = false;
-  let _autoSync = false;
-  let _lastSynced = null;
-  let _isSyncing = false;
-  const _listeners = new Set();
-
-  const connectedChannels = [
-    { id: 'upi', name: 'UPI Gateway', provider: 'PhonePe & GPay', status: 'connected' },
-    { id: 'card', name: 'Card POS', provider: 'Pine Labs Terminal', status: 'connected' },
-    { id: 'bank', name: 'Bank Feed', provider: 'HDFC Corporate NetBanking', status: 'connected' },
-    { id: 'credit', name: 'Digital Khata', provider: 'Store Credit Ledger', status: 'connected' },
-  ];
-
-  function getStatus() {
-    return {
-      status: _isAccountConnected ? 'active' : 'disconnected',
-      isAccountConnected: _isAccountConnected,
-      autoSync: _autoSync,
-      lastSynced: _lastSynced,
-      lastSyncedFormatted: _isAccountConnected
-        ? (_lastSynced ? formatSyncTime(_lastSynced) : 'Just now')
-        : 'Connect Account',
-      channels: connectedChannels,
-      isSyncing: _isSyncing,
-    };
-  }
-
-  function formatSyncTime(date) {
-    if (!date) return 'Just now';
-    const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (diffSec < 45) return 'Just now';
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function subscribe(fn) {
-    _listeners.add(fn);
-    return () => _listeners.delete(fn);
-  }
-
-  function notify() {
-    const status = getStatus();
-    _listeners.forEach(fn => {
-      try { fn(status); } catch (e) { console.error('Feed listener error:', e); }
-    });
-  }
-
-  /**
-   * Simulates account connection and imports the digital batch.
-   */
-  function connectAccount(onImportedCallback) {
-    _isSyncing = true;
-    notify();
-
-    return new Promise(resolve => {
-      setTimeout(() => {
-        _isAccountConnected = true;
-        _autoSync = true;
-        _lastSynced = new Date();
-        _isSyncing = false;
-
-        let imported = [];
-        if (typeof onImportedCallback === 'function') {
-          imported = onImportedCallback(MOCK_DIGITAL_BATCH);
-        }
-
-        notify();
-        resolve({ status: getStatus(), imported });
-      }, 1000);
-    });
-  }
-
-  /**
-   * Resets connection demo (allows repeating the demo flow).
-   */
-  function disconnectAccount(onResetCallback) {
-    _isAccountConnected = false;
-    _autoSync = false;
-    _lastSynced = null;
-    _isSyncing = false;
-
-    if (typeof onResetCallback === 'function') {
-      onResetCallback();
-    }
-
-    notify();
-    return Promise.resolve(getStatus());
-  }
-
-  /**
-   * Simulates an automatic sync.
-   */
-  function syncNow() {
-    if (!_isAccountConnected) return Promise.resolve(getStatus());
-    if (_isSyncing) return Promise.resolve(getStatus());
-    _isSyncing = true;
-    notify();
-
-    return new Promise(resolve => {
-      setTimeout(() => {
-        _lastSynced = new Date();
-        _isSyncing = false;
-        notify();
-        resolve(getStatus());
-      }, 600);
-    });
-  }
-
-  function setConnected(val) {
-    _isAccountConnected = !!val;
-    if (_isAccountConnected) {
-      _autoSync = true;
-      if (!_lastSynced) _lastSynced = new Date();
-    } else {
-      _autoSync = false;
-      _lastSynced = null;
-    }
-    notify();
-  }
-
-  return {
-    getStatus,
-    connectAccount,
-    disconnectAccount,
-    syncNow,
-    subscribe,
-    formatSyncTime,
-    setConnected,
+if (typeof DigitalFeedProvider === 'undefined') {
+  console.warn('[Cashly] DigitalFeedProvider not found in global scope. Using fallback interface.');
+  window.DigitalFeedProvider = {
+    getStatus: () => ({ status: 'disconnected', isAccountConnected: false, channels: [] }),
+    connectAccount: () => Promise.resolve({ status: {}, imported: [] }),
+    disconnectAccount: () => Promise.resolve({ status: 'disconnected' }),
+    syncNow: () => Promise.resolve({}),
+    subscribe: () => () => {},
+    setConnected: () => {},
+    getConnectedAccounts: () => [],
   };
-})();
+}
 
 /* ----------------------------------------------------------
    AppState
@@ -532,58 +413,30 @@ const AppState = (() => {
   }
 
   /* ---- Connect Demo Flow ---- */
-  function connectAccountDemo() {
-    return DigitalFeedProvider.connectAccount((batchToImport) => {
-      // Import the 5 digital transactions
-      const user = _store.currentUser;
-      const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
-      batchToImport.forEach(txn => {
-        if (!_store.transactions.some(t => t.id === txn.id)) {
-          _store.transactions.unshift({
-            ...txn,
-            userId: user ? user.id : null,
-            businessId: biz ? biz.id : null,
-          });
-        }
-      });
+  async function connectAccountDemo() {
+    const provider = (typeof defaultFinancialDataProvider !== 'undefined')
+      ? defaultFinancialDataProvider
+      : DigitalFeedProvider;
 
-      // Save imported demo transactions to Supabase if connected
-      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-        SupabaseService.insertTransactions(batchToImport).catch(err => {
-          console.warn('[Cashly] Notice saving demo batch to Supabase:', err.message || err);
-        });
-      }
-
-      return batchToImport;
-    }).then(async result => {
-      // Requirement 9: Store connected demo account in Supabase
-      const demoAccount = {
-        name: 'HDFC Bank - 8821',
-        type: 'Bank',
-        provider: 'HDFC Bank',
-        status: 'connected',
-      };
-      const existing = _store.financialAccounts.find(a => a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC')));
-      if (existing) {
-        await updateFinancialAccount(existing.id, { status: 'connected' });
-      } else {
-        await addFinancialAccount(demoAccount);
-      }
-
-      refreshAllViews();
-      return result;
+    const result = await provider.connectAccount({
+      name: 'HDFC Bank - 8821',
+      type: 'Bank',
+      provider: 'HDFC Bank',
+      status: 'connected',
     });
+
+    refreshAllViews();
+    return result;
   }
 
-  function disconnectAccountDemo() {
-    return DigitalFeedProvider.disconnectAccount(async () => {
-      _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({ ...t }));
-      const existing = _store.financialAccounts.find(a => a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC')));
-      if (existing) {
-        await updateFinancialAccount(existing.id, { status: 'disconnected' });
-      }
-      refreshAllViews();
-    });
+  async function disconnectAccountDemo() {
+    const provider = (typeof defaultFinancialDataProvider !== 'undefined')
+      ? defaultFinancialDataProvider
+      : DigitalFeedProvider;
+
+    const result = await provider.disconnectAccount();
+    refreshAllViews();
+    return result;
   }
 
   function refreshAllViews() {
@@ -716,6 +569,13 @@ const AppState = (() => {
    * @param {Object} txnData
    */
   function addTransaction(txnData) {
+    const existingId = txnData.id ? _store.transactions.find(t => t.id === txnData.id) : null;
+    if (existingId) return existingId;
+    if (txnData.reference) {
+      const existingRef = _store.transactions.find(t => t.reference && t.reference === txnData.reference);
+      if (existingRef) return existingRef;
+    }
+
     const source = txnData.source || TRANSACTION_SOURCES.MANUAL;
     const paymentMethod = txnData.paymentMethod || PAYMENT_METHODS.CASH;
 
@@ -728,7 +588,7 @@ const AppState = (() => {
 
     const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
     const newTxn = {
-      id: 'txn-' + Date.now(),
+      id: txnData.id || ('txn-' + Date.now()),
       businessId: txnData.businessId || (biz ? biz.id : null),
       userId: txnData.userId || (_store.currentUser ? _store.currentUser.id : null),
       source: source,
@@ -756,6 +616,52 @@ const AppState = (() => {
     }
 
     return newTxn;
+  }
+
+  /**
+   * Add a batch of transactions with deduplication using stable references and IDs.
+   */
+  async function addTransactionsBatch(batch) {
+    if (!Array.isArray(batch) || batch.length === 0) return [];
+    const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
+    const user = _store.currentUser;
+
+    const existingIds = new Set(_store.transactions.map(t => t.id));
+    const existingRefs = new Set(_store.transactions.map(t => t.reference).filter(Boolean));
+    const added = [];
+
+    for (const raw of batch) {
+      const id = raw.id || `txn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const ref = raw.reference || null;
+
+      // Strict deduplication check
+      if (existingIds.has(id)) continue;
+      if (ref && existingRefs.has(ref)) continue;
+
+      const item = {
+        ...raw,
+        id,
+        businessId: raw.businessId || (biz ? biz.id : null),
+        userId: raw.userId || (user ? user.id : null),
+      };
+
+      _store.transactions.unshift(item);
+      existingIds.add(id);
+      if (ref) existingRefs.add(ref);
+      added.push(item);
+    }
+
+    if (added.length > 0) {
+      refreshAllViews();
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        try {
+          await SupabaseService.insertTransactions(added);
+        } catch (err) {
+          console.warn('[Cashly] Notice saving transaction batch to Supabase:', err.message || err);
+        }
+      }
+    }
+    return added;
   }
 
   /**
@@ -1056,11 +962,16 @@ const AppState = (() => {
     return DigitalFeedProvider.getStatus();
   }
 
-  function syncFeed() {
-    return DigitalFeedProvider.syncNow().then(status => {
-      refreshAllViews();
-      return status;
-    });
+  async function syncFeed() {
+    let status;
+    if (typeof defaultFinancialDataProvider !== 'undefined') {
+      const res = await defaultFinancialDataProvider.syncTransactions();
+      status = res ? res.status : DigitalFeedProvider.getStatus();
+    } else if (typeof DigitalFeedProvider !== 'undefined' && typeof DigitalFeedProvider.syncNow === 'function') {
+      status = await DigitalFeedProvider.syncNow();
+    }
+    refreshAllViews();
+    return status;
   }
 
   function updateSyncUI(status) {
@@ -1138,6 +1049,7 @@ const AppState = (() => {
     getTransactions,
     getTransactionsBySource,
     addTransaction,
+    addTransactionsBatch,
     updateTransaction,
     deleteTransaction,
     getFinancialAccounts,
