@@ -136,13 +136,17 @@ const SupabaseService = (() => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[Cashly] Error fetching transactions from Supabase:', error);
+        if (error.code === 'PGRST205') {
+          console.warn('[Cashly] Notice: Supabase table "transactions" not found yet. Execute supabase_schema.sql in Supabase SQL editor to enable persistence.');
+        } else {
+          console.warn('[Cashly] Supabase query notice:', error.message || error);
+        }
         return null;
       }
 
       return (data || []).map(mapRowToTxn);
     } catch (err) {
-      console.error('[Cashly] Unexpected error fetching transactions:', err);
+      console.warn('[Cashly] Notice fetching transactions:', err.message || err);
       return null;
     }
   }
@@ -160,13 +164,17 @@ const SupabaseService = (() => {
         .upsert([row], { onConflict: 'id' });
 
       if (error) {
-        console.error('[Cashly] Error inserting transaction to Supabase:', error);
+        if (error.code === 'PGRST205') {
+          console.warn('[Cashly] Notice: table "transactions" not found. Run supabase_schema.sql in Supabase.');
+        } else {
+          console.warn('[Cashly] Notice inserting transaction:', error.message || error);
+        }
         return false;
       }
 
       return true;
     } catch (err) {
-      console.error('[Cashly] Unexpected error inserting transaction:', err);
+      console.warn('[Cashly] Notice inserting transaction:', err.message || err);
       return false;
     }
   }
@@ -184,13 +192,17 @@ const SupabaseService = (() => {
         .upsert(rows, { onConflict: 'id' });
 
       if (error) {
-        console.error('[Cashly] Error batch inserting transactions to Supabase:', error);
+        if (error.code === 'PGRST205') {
+          console.warn('[Cashly] Notice: table "transactions" not found. Run supabase_schema.sql in Supabase.');
+        } else {
+          console.warn('[Cashly] Notice batch inserting transactions:', error.message || error);
+        }
         return false;
       }
 
       return true;
     } catch (err) {
-      console.error('[Cashly] Unexpected error batch inserting transactions:', err);
+      console.warn('[Cashly] Notice batch inserting transactions:', err.message || err);
       return false;
     }
   }

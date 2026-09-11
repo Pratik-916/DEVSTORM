@@ -428,7 +428,7 @@ const AppState = (() => {
         await SupabaseService.insertTransactions(_store.transactions);
       }
     } catch (err) {
-      console.error('[Cashly] Error synchronizing with Supabase:', err);
+      console.warn('[Cashly] Notice synchronizing with Supabase:', err.message || err);
     }
   }
 
@@ -445,7 +445,7 @@ const AppState = (() => {
       // Save imported demo transactions to Supabase if connected
       if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
         SupabaseService.insertTransactions(batchToImport).catch(err => {
-          console.error('[Cashly] Failed to save demo batch to Supabase:', err);
+          console.warn('[Cashly] Notice saving demo batch to Supabase:', err.message || err);
         });
       }
 
@@ -530,7 +530,7 @@ const AppState = (() => {
     // Save manual transaction to Supabase if connected
     if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
       SupabaseService.insertTransaction(newTxn).catch(err => {
-        console.error('[Cashly] Failed to save transaction to Supabase:', err);
+        console.warn('[Cashly] Notice saving transaction to Supabase:', err.message || err);
       });
     }
 
