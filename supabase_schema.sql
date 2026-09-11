@@ -40,6 +40,12 @@ ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES public.businesses(id) ON DE
 ALTER TABLE public.transactions 
 ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
 
+-- Phase 9: Provider metadata columns for real financial provider & Account Aggregator readiness
+ALTER TABLE public.transactions
+ADD COLUMN IF NOT EXISTS provider TEXT,
+ADD COLUMN IF NOT EXISTS provider_account_id TEXT,
+ADD COLUMN IF NOT EXISTS provider_transaction_id TEXT;
+
 -- 3. FINANCIAL ACCOUNTS TABLE
 -- Tracks connected banking, UPI, and digital merchant accounts for a business.
 CREATE TABLE IF NOT EXISTS public.financial_accounts (
@@ -51,6 +57,12 @@ CREATE TABLE IF NOT EXISTS public.financial_accounts (
     status TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected', 'disconnected', 'syncing', 'pending')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Phase 9: Financial account provider metadata for connection lifecycle & external ID mapping
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS external_account_id TEXT,
+ADD COLUMN IF NOT EXISTS connection_status TEXT DEFAULT 'disconnected',
+ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ;
 
 -- 4. UPCOMING OBLIGATIONS TABLE
 -- Tracks scheduled vendor payments, rent, payroll, and upcoming liabilities.
@@ -90,6 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_upcoming_obligations_due_date ON public.upcoming_
 CREATE INDEX IF NOT EXISTS idx_alerts_business_id ON public.alerts (business_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON public.alerts (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_alerts_business_unread ON public.alerts (business_id, is_read, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider_tx ON public.transactions (provider, provider_account_id, provider_transaction_id);
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS) PREPARATION & POLICIES

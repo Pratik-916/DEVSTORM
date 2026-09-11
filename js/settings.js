@@ -39,6 +39,9 @@ const Settings = (() => {
       const icon = typeIcons[type] || typeIcons.Bank;
       const isConnected = acc.status === 'connected';
 
+      const isSimulated = (acc.provider === 'mock' || acc.provider === 'MockSandboxProvider' || (acc.name && acc.name.includes('HDFC') && (!acc.provider || acc.provider === 'HDFC Bank')) || acc.external_account_id === 'hdfc-merchant-8821');
+      const providerLabel = isSimulated ? 'Demo Account • Simulated Feed' : escapeHtml(acc.provider || acc.name);
+
       html += `
         <div class="settings-row" id="account-row-${escapeHtml(acc.id)}" style="margin-bottom:var(--sp-2);">
           <div class="settings-row-left">
@@ -52,7 +55,7 @@ const Settings = (() => {
                   ${escapeHtml(acc.type || 'Bank')} • ${isConnected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
-              <p class="settings-row-desc">${escapeHtml(acc.provider || acc.name)}</p>
+              <p class="settings-row-desc">${providerLabel}</p>
             </div>
           </div>
           <div class="settings-row-right" style="display:flex;align-items:center;gap:6px;">

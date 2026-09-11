@@ -176,21 +176,64 @@ Proactive cashflow notifications and warnings.
 
 ---
 
-## 6. Financial Data Provider Layer
+## 6. Financial Data Integration Architecture (Account Aggregator Ready)
 
-Cashly includes a decoupled **`FinancialDataProvider`** interface designed for financial institution integration:
-- `connectAccount(accountConfig)`
-- `disconnectAccount(accountId)`
-- `syncTransactions(options)`
-- `getConnectedAccounts()`
-- `getSyncStatus()`
-- `normalizeTransaction(rawPayload)`
+Cashly is engineered with an enterprise-grade financial provider abstraction layer, allowing simulated demonstration feeds to be seamlessly superseded by live, consent-backed banking feeds without refactoring any downstream business logic.
 
-### Simulated Sandbox Feed Notice
+```text
+Financial Source (Banks, UPI, Card, POS)
+       ↓
+Account Aggregator (RBI-Regulated NBFC-AA)
+       ↓
+Secure Backend Boundary (Supabase Edge Functions)
+       ↓
+Cashly Provider Adapter (FinancialDataProvider / ProviderRegistry)
+       ↓
+Transaction Normalizer (Composite Deduplication)
+       ↓
+Supabase PostgreSQL (RLS Enforced)
+       ↓
+Cashflow Engine (Available Cash, Safe to Spend, Runways, Alerts)
+```
+
+### Key Architectural Components
+
+1. **Provider Abstraction (`js/provider.js`)**:
+   - `FinancialDataProvider`: Base contract requiring `connectAccount()`, `disconnectAccount()`, `syncTransactions()`, `getConnectedAccounts()`, `getSyncStatus()`, and `normalizeTransaction()`.
+   - `ProviderRegistry`: Registry decoupling active providers from the Cashflow Engine.
+   - `ProviderType`: Standard classification supporting `mock`, `aa`, `payment`, `bank`, and `unavailable`.
+
+2. **Transaction Normalization & Metadata**:
+   - All incoming financial feeds are converted into Cashly's unified transaction schema:
+     `id, business_id, type, amount, source, payment_method, settlement_status, category, channel, reference, description, transaction_date, created_at`.
+   - Non-intrusive provider audit metadata (`provider`, `provider_account_id`, `provider_transaction_id`) is attached without altering cashflow mathematics.
+
+3. **Composite Deduplication & Idempotency**:
+   - Multiple synchronizations and webhook retries are strictly idempotent.
+   - Incoming items are matched against primary IDs, external references, and composite keys:
+     $$\text{Composite Key} = \text{provider} + \text{":"} + \text{provider\_account\_id} + \text{":"} + \text{provider\_transaction\_id}$$
+   - Redundant transactions are skipped with zero state mutations.
+
+4. **Financial Account Connection Lifecycle**:
+   - Explicit finite state machine:
+     $$\text{DISCONNECTED} \longrightarrow \text{CONNECTING} \longrightarrow \text{CONSENT\_REQUIRED} \longrightarrow \text{SYNCING} \longrightarrow \text{CONNECTED}$$
+   - Includes failure/retry transitions ($\text{ERROR}$) and graceful disconnects.
+
+5. **Future Account Aggregator (AA) Integration**:
+   - Prepared for India's Reserve Bank of India (RBI) NBFC-AA framework (e.g. Setu, Anumati, OneMoney).
+   - Designed around user-approved, electronic, time-bound consent artifacts requesting read-only access to transaction history from Financial Information Providers (FIPs).
+
+6. **Secure Server-Side Backend Boundary**:
+   - **Zero Secret Exposure**: Frontend client code **never** handles private signing certificates, FIU client secrets, or webhook verification HMAC keys.
+   - All consent generation, private key decryption, and webhook processing are specified for **Supabase Edge Functions**.
+   - Cashly **never** requests or stores banking passwords, UPI PINs, ATM PINs, or OTPs.
+
+7. **Asynchronous Webhook Architecture**:
+   - Future banking/gateway events post directly to Edge Functions.
+   - Edge functions verify webhook signatures, normalize payloads, write to Supabase under the merchant's `business_id`, and notify the client via Supabase Realtime.
+
 > [!IMPORTANT]
-> **Financial Data Simulation Notice**: Cashly currently utilizes `MockFinancialDataProvider` to simulate multi-channel digital feeds (UPI via PhonePe/GPay, POS terminals via Pine Labs, IMPS bank transfers, and digital Khata ledgers) for demonstration and testing purposes.
->
-> Cashly **does NOT** currently connect to live production bank APIs, Razorpay live rails, or production Account Aggregator (AA) handles. The provider layer is deliberately structured so that future NBFC-AA or banking open API integrations can be slotted in by implementing the `FinancialDataProvider` interface without altering the Cashflow Engine.
+> **Data Source Transparency Notice**: Cashly currently uses simulated financial data for demonstration. Real financial-data integration requires a compliant provider and consent-based integration. Cashly does not claim live bank connectivity until an official FIU registration and AA connector is configured and authorized. Detailed documentation is available in [`docs/financial-data-architecture.md`](docs/financial-data-architecture.md).
 
 ---
 

@@ -8,61 +8,262 @@
  *  - syncTransactions(options)
  *  - getConnectedAccounts()
  *  - getSyncStatus()
+ *  - normalizeTransaction(rawTxn, businessId, userId)
+ *  - normalizeTransactions(rawTxns, businessId, userId)
+ *  - subscribe(fn)
  *
- * Provides MockFinancialDataProvider for sandbox/demo multi-channel feeds
- * (UPI, Card, Bank Transfer, and Credit) with transaction normalization,
- * stable reference deduplication, and persistence in Supabase.
+ * Provides:
+ *  - ProviderType: Standard provider classification (mock, aa, payment, bank, unavailable)
+ *  - ConnectionState: Strict connection lifecycle (DISCONNECTED, CONNECTING, CONSENT_REQUIRED, CONNECTED, SYNCING, ERROR)
+ *  - AccountAggregatorProvider: Future-ready RBI AA specification adapter with backend Edge Function boundary
+ *  - MockFinancialDataProvider: Sandbox/demo multi-channel feed with stable composite deduplication & Supabase persistence
+ *  - ProviderRegistry: Pluggable registry allowing real providers to replace mock feeds without rewriting Cashflow Engine
+ *  - DigitalFeedProvider: 100% backwards-compatible facade for existing Cashly modules
  */
 
 'use strict';
 
 /**
- * Base FinancialDataProvider specification
+ * Provider Classification Types
+ */
+const ProviderType = Object.freeze({
+  MOCK: 'mock',             // Simulated demo/sandbox provider
+  AA: 'aa',                 // Consent-based RBI Account Aggregator (FIU/FIP)
+  PAYMENT: 'payment',       // Payment Gateways / POS Terminals (e.g. Razorpay, PineLabs)
+  BANK: 'bank',             // Direct Bank Feed / Open Banking APIs
+  UNAVAILABLE: 'unavailable', // Inactive or unsupported provider
+});
+
+/**
+ * Connection Lifecycle States
+ */
+const ConnectionState = Object.freeze({
+  DISCONNECTED: 'DISCONNECTED',
+  CONNECTING: 'CONNECTING',
+  CONSENT_REQUIRED: 'CONSENT_REQUIRED',
+  CONNECTED: 'CONNECTED',
+  SYNCING: 'SYNCING',
+  ERROR: 'ERROR',
+});
+
+/**
+ * Base FinancialDataProvider Specification
+ * Every provider (Mock, AA, Payment Gateway, Core Bank) implements this contract.
  */
 class FinancialDataProvider {
-  constructor(name = 'GenericProvider') {
+  /**
+   * @param {string} name - Friendly provider name
+   * @param {string} type - Value from ProviderType enum
+   */
+  constructor(name = 'GenericProvider', type = ProviderType.MOCK) {
     this.name = name;
+    this.type = type;
   }
 
+  /**
+   * Initiates account connection or consent handshake.
+   * @param {Object} accountConfig - Provider-specific configuration
+   * @returns {Promise<Object>}
+   */
   async connectAccount(accountConfig) {
-    throw new Error('connectAccount() must be implemented by provider');
+    throw new Error(`connectAccount() must be implemented by ${this.name}`);
   }
 
+  /**
+   * Terminates active provider session or revokes consent.
+   * @param {string} accountId - Financial account identifier
+   * @returns {Promise<Object>}
+   */
   async disconnectAccount(accountId) {
-    throw new Error('disconnectAccount() must be implemented by provider');
+    throw new Error(`disconnectAccount() must be implemented by ${this.name}`);
   }
 
+  /**
+   * Synchronizes external transactions into Cashly.
+   * @param {Object} options - Sync parameters (e.g. force: boolean, dateRange: Object)
+   * @returns {Promise<Object>}
+   */
   async syncTransactions(options) {
-    throw new Error('syncTransactions() must be implemented by provider');
+    throw new Error(`syncTransactions() must be implemented by ${this.name}`);
   }
 
+  /**
+   * Retrieves list of active accounts under this provider.
+   * @returns {Array<Object>}
+   */
   getConnectedAccounts() {
-    throw new Error('getConnectedAccounts() must be implemented by provider');
+    throw new Error(`getConnectedAccounts() must be implemented by ${this.name}`);
+  }
+
+  /**
+   * Retrieves comprehensive sync & connection state.
+   * @returns {Object}
+   */
+  getSyncStatus() {
+    throw new Error(`getSyncStatus() must be implemented by ${this.name}`);
+  }
+
+  /**
+   * Normalizes a single raw provider transaction into Cashly's standard transaction schema.
+   * @param {Object} rawTxn - Raw provider payload
+   * @param {string|null} businessId - Target business UUID
+   * @param {string|null} userId - Target user UUID
+   * @returns {Object} Cashly standardized transaction
+   */
+  normalizeTransaction(rawTxn, businessId = null, userId = null) {
+    throw new Error(`normalizeTransaction() must be implemented by ${this.name}`);
+  }
+
+  /**
+   * Batch helper for transaction normalization.
+   * @param {Array<Object>} rawTxns - Array of raw provider transactions
+   * @param {string|null} businessId - Target business UUID
+   * @param {string|null} userId - Target user UUID
+   * @returns {Array<Object>} Array of standardized transactions
+   */
+  normalizeTransactions(rawTxns = [], businessId = null, userId = null) {
+    if (!Array.isArray(rawTxns)) return [];
+    return rawTxns.map(raw => this.normalizeTransaction(raw, businessId, userId));
+  }
+
+  /**
+   * Subscribes to status and sync updates.
+   * @param {Function} fn
+   * @returns {Function} unsubscribe callback
+   */
+  subscribe(fn) {
+    return () => {};
+  }
+}
+
+/**
+ * AccountAggregatorProvider
+ * Future-ready adapter for RBI-regulated Account Aggregator (NBFC-AA) ecosystem.
+ *
+ * Architectural Boundary:
+ * All consent requests, digital signature verification, private keys, and FIP decryption
+ * MUST occur in secure backend infrastructure (e.g. Supabase Edge Functions), never in the browser.
+ */
+class AccountAggregatorProvider extends FinancialDataProvider {
+  constructor(config = {}) {
+    super('AccountAggregatorProvider', ProviderType.AA);
+    this.fiuId = config.fiuId || null;
+    this.aaEndpoint = config.aaEndpoint || null;
+    this._connectionState = ConnectionState.DISCONNECTED;
+    this._isSyncing = false;
+  }
+
+  /**
+   * Creates a consent request via secure backend Edge Function.
+   * Direct client-to-AA calls are prohibited.
+   */
+  async createConsentRequest(consentParams = {}) {
+    throw new Error(
+      '[Cashly Security Boundary] Account Aggregator consent initiation requires server-side execution via Supabase Edge Functions. Client-side direct connection is prohibited to protect banking tokens.'
+    );
+  }
+
+  /**
+   * Queries consent status from the backend Edge Function.
+   */
+  async getConsentStatus(consentHandle) {
+    throw new Error(
+      '[Cashly Security Boundary] Consent verification must be verified via Supabase Edge Function with signed FIU certificates.'
+    );
+  }
+
+  /**
+   * Retrieves encrypted financial data through backend boundary.
+   */
+  async fetchFinancialData(consentId, sessionId) {
+    throw new Error(
+      '[Cashly Security Boundary] Financial Information Provider (FIP) payload decryption requires FIU private key residing in secure server vault.'
+    );
+  }
+
+  /**
+   * Normalizes an RBI Account Aggregator standardized transaction payload into Cashly schema.
+   * Handles bank statements, deposit account summaries, and UPI logs.
+   */
+  normalizeTransaction(rawAATxn, businessId = null, userId = null) {
+    if (!rawAATxn) return null;
+
+    const txnId = rawAATxn.txnId || rawAATxn.transactionId || `aa-txn-${Date.now()}`;
+    const rawType = (rawAATxn.type || '').toUpperCase();
+    const isExpense = rawType === 'DEBIT';
+    const amount = Math.abs(Number(rawAATxn.amount)) || 0;
+
+    // Map RBI mode (UPI, CARD, IMPS, NEFT, RTGS, CASH) to Cashly paymentMethod
+    let mode = (rawAATxn.mode || 'BANK').toUpperCase();
+    let paymentMethod = 'bank';
+    if (mode === 'UPI') paymentMethod = 'upi';
+    else if (mode === 'CARD' || mode === 'POS') paymentMethod = 'card';
+    else if (mode === 'CASH') paymentMethod = 'cash';
+    else if (mode === 'CREDIT' || mode === 'OD') paymentMethod = 'credit';
+
+    // Parse date (supports ISO timestamp, valueDate, or transactionTimestamp)
+    const rawDate = rawAATxn.valueDate || rawAATxn.transactionTimestamp || new Date().toISOString();
+    const dateStr = String(rawDate).slice(0, 10);
+
+    const stableId = `txn-aa-${(rawAATxn.accountId || 'fip').replace(/[^a-zA-Z0-9]/g, '')}-${txnId}`;
+
+    return {
+      id: stableId,
+      businessId: businessId || rawAATxn.businessId || null,
+      userId: userId || rawAATxn.userId || null,
+      source: 'auto',
+      type: isExpense ? 'expense' : 'sale',
+      amount: amount,
+      paymentMethod: paymentMethod,
+      channel: `Bank • AA Verified (${mode})`,
+      reference: rawAATxn.reference || rawAATxn.narration || txnId,
+      settlementStatus: 'settled',
+      category: isExpense ? 'supplier' : 'sales',
+      description: rawAATxn.narration || 'Account Aggregator Verified Inflow',
+      date: dateStr,
+      time: new Date(rawDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date(rawDate).toISOString(),
+      // Phase 9 Provider Metadata
+      provider: ProviderType.AA,
+      provider_account_id: rawAATxn.accountId || rawAATxn.fipId || 'aa-fip-account',
+      provider_transaction_id: txnId,
+    };
   }
 
   getSyncStatus() {
-    throw new Error('getSyncStatus() must be implemented by provider');
-  }
-
-  normalizeTransaction(rawTxn) {
-    throw new Error('normalizeTransaction() must be implemented by provider');
+    return {
+      status: 'disconnected',
+      connectionState: this._connectionState,
+      providerType: ProviderType.AA,
+      isAccountConnected: false,
+      autoSync: false,
+      lastSynced: null,
+      lastSyncedFormatted: 'Consent Required',
+      channels: [],
+      isSyncing: this._isSyncing,
+      isSimulated: false,
+      sourceLabel: 'RBI Licensed Account Aggregator',
+      feedLabel: 'Consent-Based Live Feed',
+    };
   }
 }
 
 /**
  * MockFinancialDataProvider
- * Simulates digital feeds across UPI, Card, Bank Transfer, and Credit.
+ * Production-ready sandbox simulator providing multi-channel digital feeds
+ * across UPI, Card, Bank Transfer, and Credit with idempotent deduplication.
  */
 class MockFinancialDataProvider extends FinancialDataProvider {
   constructor() {
-    super('MockSandboxProvider');
+    super('MockSandboxProvider', ProviderType.MOCK);
     this._isAccountConnected = false;
     this._autoSync = false;
     this._lastSynced = null;
     this._isSyncing = false;
+    this._connectionState = ConnectionState.DISCONNECTED;
     this._listeners = new Set();
 
-    // Default simulated integration channels
+    // Simulated integration channels
     this._channels = [
       { id: 'upi', name: 'UPI Gateway', provider: 'PhonePe & GPay', type: 'UPI', status: 'connected' },
       { id: 'card', name: 'Card POS', provider: 'Pine Labs Terminal', type: 'Card', status: 'connected' },
@@ -70,10 +271,11 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       { id: 'credit', name: 'Digital Khata', provider: 'Store Credit Ledger', type: 'Credit', status: 'connected' },
     ];
 
-    // Raw digital feed batch with stable references
+    // Raw digital feed batch with stable identities
     this._mockBatch = [
       {
         providerId: 'feed-upi-409281736192',
+        providerAccountId: 'hdfc-merchant-8821',
         source: 'auto',
         type: 'sale',
         amount: 2000,
@@ -89,6 +291,7 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       },
       {
         providerId: 'feed-card-pos-9812',
+        providerAccountId: 'hdfc-merchant-8821',
         source: 'auto',
         type: 'sale',
         amount: 3800,
@@ -104,6 +307,7 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       },
       {
         providerId: 'feed-bank-imps-432019882',
+        providerAccountId: 'hdfc-merchant-8821',
         source: 'auto',
         type: 'sale',
         amount: 1950,
@@ -119,6 +323,7 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       },
       {
         providerId: 'feed-cr-kht-771',
+        providerAccountId: 'hdfc-merchant-8821',
         source: 'auto',
         type: 'sale',
         amount: 2000,
@@ -134,6 +339,7 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       },
       {
         providerId: 'feed-bank-hdfc-8830192',
+        providerAccountId: 'hdfc-merchant-8821',
         source: 'auto',
         type: 'expense',
         amount: 2000,
@@ -151,36 +357,47 @@ class MockFinancialDataProvider extends FinancialDataProvider {
   }
 
   /**
-   * Normalizes any provider transaction into Cashly's standardized transaction schema.
+   * Normalizes provider transaction into Cashly's standard transaction schema.
+   * Maps provider metadata cleanly without polluting cashflow logic.
    */
   normalizeTransaction(rawTxn, businessId = null, userId = null) {
-    const stableId = rawTxn.id || (rawTxn.providerId ? `txn-${rawTxn.providerId}` : `txn-feed-${(rawTxn.reference || '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`);
-    
-    let method = (rawTxn.paymentMethod || 'upi').toLowerCase();
+    if (!rawTxn) return null;
+
+    const rawProviderId = rawTxn.providerId || rawTxn.provider_transaction_id || rawTxn.reference;
+    const stableId = rawTxn.id || (rawProviderId ? `txn-${rawProviderId}` : `txn-feed-${(rawTxn.reference || '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`);
+
+    let method = (rawTxn.paymentMethod || rawTxn.payment_method || 'upi').toLowerCase();
     if (method === 'bank transfer' || method === 'bank_transfer' || method === 'netbanking') method = 'bank';
     if (method === 'credit ledger' || method === 'khata') method = 'credit';
 
+    const providerAccountId = rawTxn.providerAccountId || rawTxn.provider_account_id || 'hdfc-merchant-8821';
+    const providerTransactionId = rawTxn.providerId || rawTxn.provider_transaction_id || rawTxn.reference || stableId;
+
     return {
       id: stableId,
-      businessId: businessId || rawTxn.businessId || null,
-      userId: userId || rawTxn.userId || null,
+      businessId: businessId || rawTxn.businessId || rawTxn.business_id || null,
+      userId: userId || rawTxn.userId || rawTxn.user_id || null,
       source: 'auto',
       type: rawTxn.type === 'expense' ? 'expense' : (rawTxn.type === 'withdrawal' ? 'withdrawal' : 'sale'),
       amount: Math.abs(Number(rawTxn.amount)) || 0,
       paymentMethod: method,
       channel: rawTxn.channel || `${method.toUpperCase()} • Digital`,
       reference: rawTxn.reference || `REF-${stableId}`,
-      settlementStatus: rawTxn.settlementStatus === 'settled' ? 'settled' : 'pending',
+      settlementStatus: (rawTxn.settlementStatus === 'settled' || rawTxn.settlement_status === 'settled') ? 'settled' : 'pending',
       category: rawTxn.category || (rawTxn.type === 'expense' ? 'supplier' : 'sales'),
       description: rawTxn.description || 'Digital Transaction',
-      date: rawTxn.date || new Date().toISOString().slice(0, 10),
+      date: rawTxn.date || rawTxn.transaction_date || new Date().toISOString().slice(0, 10),
       time: rawTxn.time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      createdAt: rawTxn.createdAt || new Date().toISOString(),
+      createdAt: rawTxn.createdAt || rawTxn.created_at || new Date().toISOString(),
+      // Phase 9 Standard Provider Metadata
+      provider: ProviderType.MOCK,
+      provider_account_id: providerAccountId,
+      provider_transaction_id: providerTransactionId,
     };
   }
 
   /**
-   * Format relative sync time for user display.
+   * Format relative sync timestamp for user display.
    */
   formatSyncTime(date) {
     if (!date) return 'Just now';
@@ -194,6 +411,8 @@ class MockFinancialDataProvider extends FinancialDataProvider {
   getSyncStatus() {
     return {
       status: this._isAccountConnected ? 'active' : 'disconnected',
+      connectionState: this._connectionState,
+      providerType: ProviderType.MOCK,
       isAccountConnected: this._isAccountConnected,
       autoSync: this._autoSync,
       lastSynced: this._lastSynced,
@@ -202,6 +421,9 @@ class MockFinancialDataProvider extends FinancialDataProvider {
         : 'Connect Account',
       channels: this._channels,
       isSyncing: this._isSyncing,
+      isSimulated: true,
+      sourceLabel: 'Demo / Simulated Financial Account',
+      feedLabel: 'Simulated Feed',
     };
   }
 
@@ -223,9 +445,11 @@ class MockFinancialDataProvider extends FinancialDataProvider {
   setConnected(val) {
     this._isAccountConnected = !!val;
     if (this._isAccountConnected) {
+      this._connectionState = ConnectionState.CONNECTED;
       this._autoSync = true;
       if (!this._lastSynced) this._lastSynced = new Date();
     } else {
+      this._connectionState = ConnectionState.DISCONNECTED;
       this._autoSync = false;
       this._lastSynced = null;
     }
@@ -233,59 +457,84 @@ class MockFinancialDataProvider extends FinancialDataProvider {
   }
 
   /**
-   * Connect an account and persist the connected state in Supabase.
+   * Connect an account with strict lifecycle transitions and Supabase persistence.
+   * Lifecycle: DISCONNECTED -> CONNECTING -> CONSENT_REQUIRED -> SYNCING -> CONNECTED
    */
   async connectAccount(accountConfig = {}) {
-    this._isSyncing = true;
-    this._notify();
+    try {
+      this._connectionState = ConnectionState.CONNECTING;
+      this._isSyncing = true;
+      this._notify();
 
-    // Simulate network handshake
-    await new Promise(resolve => setTimeout(resolve, 800));
+      // Simulate handshake & consent verification
+      await new Promise(resolve => setTimeout(resolve, 400));
+      this._connectionState = ConnectionState.CONSENT_REQUIRED;
+      this._notify();
 
-    this._isAccountConnected = true;
-    this._autoSync = true;
-    this._lastSynced = new Date();
-    this._isSyncing = false;
+      await new Promise(resolve => setTimeout(resolve, 400));
+      this._connectionState = ConnectionState.SYNCING;
+      this._notify();
 
-    // 1. Persist connection state to Supabase financial_accounts
-    const demoAccount = {
-      name: accountConfig.name || 'HDFC Bank - 8821',
-      type: accountConfig.type || 'Bank',
-      provider: accountConfig.provider || 'HDFC Bank',
-      status: 'connected',
-    };
+      this._isAccountConnected = true;
+      this._autoSync = true;
+      this._lastSynced = new Date();
+      this._connectionState = ConnectionState.CONNECTED;
+      this._isSyncing = false;
 
-    if (typeof AppState !== 'undefined' && typeof AppState.addFinancialAccount === 'function') {
-      const existingAccounts = AppState.getFinancialAccounts() || [];
-      const existing = existingAccounts.find(a => 
-        a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC'))
-      );
-      if (existing) {
-        await AppState.updateFinancialAccount(existing.id, { status: 'connected' });
-      } else {
-        await AppState.addFinancialAccount(demoAccount);
+      // 1. Persist connection state to Supabase financial_accounts with provider metadata
+      const demoAccount = {
+        name: accountConfig.name || 'HDFC Bank - 8821',
+        type: accountConfig.type || 'Bank',
+        provider: ProviderType.MOCK,
+        status: 'connected',
+        external_account_id: 'hdfc-merchant-8821',
+        connection_status: ConnectionState.CONNECTED,
+        last_synced_at: new Date().toISOString(),
+      };
+
+      if (typeof AppState !== 'undefined' && typeof AppState.addFinancialAccount === 'function') {
+        const existingAccounts = AppState.getFinancialAccounts() || [];
+        const existing = existingAccounts.find(a => 
+          a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC')) || (a.external_account_id === 'hdfc-merchant-8821')
+        );
+        if (existing) {
+          await AppState.updateFinancialAccount(existing.id, {
+            status: 'connected',
+            connection_status: ConnectionState.CONNECTED,
+            last_synced_at: new Date().toISOString(),
+          });
+        } else {
+          await AppState.addFinancialAccount(demoAccount);
+        }
       }
+
+      // 2. Perform initial transaction sync with strict deduplication
+      const syncResult = await this.syncTransactions({ force: true });
+
+      this._notify();
+      return {
+        status: this.getSyncStatus(),
+        imported: syncResult.imported || [],
+        account: demoAccount,
+      };
+    } catch (err) {
+      this._connectionState = ConnectionState.ERROR;
+      this._isSyncing = false;
+      this._notify();
+      throw err;
     }
-
-    // 2. Perform initial transaction sync with deduplication
-    const syncResult = await this.syncTransactions({ force: true });
-
-    this._notify();
-    return {
-      status: this.getSyncStatus(),
-      imported: syncResult.imported || [],
-      account: demoAccount,
-    };
   }
 
   /**
-   * Disconnect an account and persist the disconnected state in Supabase.
+   * Disconnect an account and persist state to Supabase.
+   * Lifecycle: CONNECTED -> DISCONNECTED
    */
   async disconnectAccount(accountId = null) {
     this._isAccountConnected = false;
     this._autoSync = false;
     this._lastSynced = null;
     this._isSyncing = false;
+    this._connectionState = ConnectionState.DISCONNECTED;
 
     // Update financial account status in Supabase
     if (typeof AppState !== 'undefined') {
@@ -295,7 +544,10 @@ class MockFinancialDataProvider extends FinancialDataProvider {
         : existingAccounts.find(a => a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC')));
 
       if (match) {
-        await AppState.updateFinancialAccount(match.id, { status: 'disconnected' });
+        await AppState.updateFinancialAccount(match.id, {
+          status: 'disconnected',
+          connection_status: ConnectionState.DISCONNECTED,
+        });
       }
     }
 
@@ -304,8 +556,9 @@ class MockFinancialDataProvider extends FinancialDataProvider {
   }
 
   /**
-   * Synchronize transactions from provider channels into Cashly.
-   * Normalizes payloads and strictly prevents duplicate transactions using stable reference/id.
+   * Synchronize transactions with idempotent deduplication.
+   * Uses composite identity: provider + provider_account_id + provider_transaction_id,
+   * alongside primary key ID and external transaction reference.
    */
   async syncTransactions(options = {}) {
     if (!this._isAccountConnected && !options.force) {
@@ -316,11 +569,13 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       return { status: this.getSyncStatus(), imported: [], count: 0 };
     }
 
+    const previousState = this._connectionState;
     this._isSyncing = true;
+    this._connectionState = ConnectionState.SYNCING;
     this._notify();
 
-    // Small delay to simulate real-time provider fetch
-    await new Promise(resolve => setTimeout(resolve, 400));
+    // Simulate provider fetch network latency
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     const biz = (typeof SupabaseService !== 'undefined' && SupabaseService.getCurrentBusiness)
       ? SupabaseService.getCurrentBusiness()
@@ -329,32 +584,42 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       ? SupabaseService.getUser()
       : null;
 
-    // 1. Normalize provider batch
-    const normalizedBatch = this._mockBatch.map(raw => 
-      this.normalizeTransaction(raw, biz?.id, user?.id)
-    );
+    // 1. Normalize provider batch into Cashly schema
+    const normalizedBatch = this.normalizeTransactions(this._mockBatch, biz?.id, user?.id);
 
-    // 2. Query existing transactions for deduplication
+    // 2. Query existing transactions to construct deduplication lookup sets
     const existingTxns = (typeof AppState !== 'undefined' && typeof AppState.getTransactions === 'function')
       ? AppState.getTransactions()
       : [];
 
-    const existingRefs = new Set();
     const existingIds = new Set();
+    const existingRefs = new Set();
+    const existingCompositeKeys = new Set();
 
     existingTxns.forEach(t => {
       if (t.id) existingIds.add(t.id);
       if (t.reference) existingRefs.add(t.reference);
+      // Preferred composite identity: provider + provider_account_id + provider_transaction_id
+      const p = t.provider || ProviderType.MOCK;
+      const pa = t.provider_account_id || t.providerAccountId || '';
+      const pt = t.provider_transaction_id || t.providerTransactionId || '';
+      if (pa && pt) {
+        existingCompositeKeys.add(`${p}:${pa}:${pt}`);
+      }
     });
 
-    // 3. Filter out duplicates using stable reference OR stable id
+    // 3. Filter out duplicate transactions
     const newTransactions = normalizedBatch.filter(item => {
       if (existingIds.has(item.id)) return false;
       if (item.reference && existingRefs.has(item.reference)) return false;
+
+      const pKey = `${item.provider}:${item.provider_account_id}:${item.provider_transaction_id}`;
+      if (existingCompositeKeys.has(pKey)) return false;
+
       return true;
     });
 
-    // 4. If new transactions exist, import them into AppState & persist to Supabase
+    // 4. Import new unique transactions only
     if (newTransactions.length > 0) {
       if (typeof AppState !== 'undefined' && typeof AppState.addTransactionsBatch === 'function') {
         await AppState.addTransactionsBatch(newTransactions);
@@ -367,6 +632,7 @@ class MockFinancialDataProvider extends FinancialDataProvider {
 
     this._lastSynced = new Date();
     this._isSyncing = false;
+    this._connectionState = this._isAccountConnected ? ConnectionState.CONNECTED : previousState;
     this._notify();
 
     console.log(`[FinancialDataProvider] Sync complete: ${newTransactions.length} new transactions imported (${normalizedBatch.length - newTransactions.length} duplicates skipped).`);
@@ -387,22 +653,67 @@ class MockFinancialDataProvider extends FinancialDataProvider {
     return this._channels.filter(c => c.status === 'connected');
   }
 
-  /**
-   * Compatibility method for existing syncNow calls
-   */
   async syncNow() {
     const res = await this.syncTransactions();
     return res.status;
   }
 }
 
-// Singleton instances
+/**
+ * ProviderRegistry
+ * Pluggable registry that decouples provider instances from the Cashflow Engine.
+ */
+class ProviderRegistry {
+  constructor() {
+    this._providers = new Map();
+    this._activeType = ProviderType.MOCK;
+  }
+
+  register(type, providerInstance) {
+    if (!(providerInstance instanceof FinancialDataProvider)) {
+      console.warn(`[ProviderRegistry] Warning: Registered provider does not inherit from FinancialDataProvider.`);
+    }
+    this._providers.set(type, providerInstance);
+  }
+
+  getProvider(type) {
+    return this._providers.get(type) || null;
+  }
+
+  getActiveProvider() {
+    return this._providers.get(this._activeType) || this._providers.get(ProviderType.MOCK) || null;
+  }
+
+  setActiveProvider(type) {
+    if (this._providers.has(type)) {
+      this._activeType = type;
+    } else {
+      console.warn(`[ProviderRegistry] Provider '${type}' is not registered.`);
+    }
+  }
+
+  listProviders() {
+    return Array.from(this._providers.keys());
+  }
+}
+
+// Instantiate default providers and registry
+const defaultProviderRegistry = new ProviderRegistry();
 const defaultFinancialDataProvider = new MockFinancialDataProvider();
+const defaultAAProvider = new AccountAggregatorProvider();
+
+defaultProviderRegistry.register(ProviderType.MOCK, defaultFinancialDataProvider);
+defaultProviderRegistry.register(ProviderType.AA, defaultAAProvider);
 
 /**
- * Backward compatibility facade for DigitalFeedProvider
+ * Backward compatibility facade for DigitalFeedProvider.
+ * Preserves all Phase 1-8 methods while exposing Phase 9 architecture abstractions.
  */
 const DigitalFeedProvider = {
+  ProviderType,
+  ConnectionState,
+  ProviderRegistry,
+  defaultProviderRegistry,
   getStatus: () => defaultFinancialDataProvider.getSyncStatus(),
   connectAccount: (onImportCallback) => {
     return defaultFinancialDataProvider.connectAccount().then(result => {
@@ -427,20 +738,31 @@ const DigitalFeedProvider = {
   setConnected: (val) => defaultFinancialDataProvider.setConnected(val),
   getConnectedAccounts: () => defaultFinancialDataProvider.getConnectedAccounts(),
   normalizeTransaction: (raw, bizId, userId) => defaultFinancialDataProvider.normalizeTransaction(raw, bizId, userId),
+  normalizeTransactions: (raws, bizId, userId) => defaultFinancialDataProvider.normalizeTransactions(raws, bizId, userId),
 };
 
-// Global exports
+// Global environment exports
 if (typeof window !== 'undefined') {
+  window.ProviderType = ProviderType;
+  window.ConnectionState = ConnectionState;
   window.FinancialDataProvider = FinancialDataProvider;
+  window.AccountAggregatorProvider = AccountAggregatorProvider;
   window.MockFinancialDataProvider = MockFinancialDataProvider;
+  window.ProviderRegistry = ProviderRegistry;
+  window.defaultProviderRegistry = defaultProviderRegistry;
   window.defaultFinancialDataProvider = defaultFinancialDataProvider;
   window.DigitalFeedProvider = DigitalFeedProvider;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    ProviderType,
+    ConnectionState,
     FinancialDataProvider,
+    AccountAggregatorProvider,
     MockFinancialDataProvider,
+    ProviderRegistry,
+    defaultProviderRegistry,
     defaultFinancialDataProvider,
     DigitalFeedProvider,
   };
