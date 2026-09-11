@@ -991,44 +991,31 @@
           <!-- Safety Buffer Note -->
           <p id="intel-explanation" style="font-size:var(--text-xs);color:var(--c-text-muted);margin-bottom:var(--sp-4);line-height:1.6;"></p>
 
-          <!-- Insight cards -->
-          <h2
-            style="font-size:var(--text-md);font-weight:var(--fw-semibold);color:var(--c-text-primary);margin-bottom:var(--sp-3);">
-            Observations</h2>
+          <!-- Cashly Advisor Recommendations -->
+          <h2 style="font-size:var(--text-md);font-weight:var(--fw-semibold);color:var(--c-text-primary);margin-bottom:var(--sp-3);margin-top:var(--sp-6);">
+            Cashly Advisor — Smart Recommendations
+          </h2>
 
           <div id="insights-recommendations-container">
-            <div class="insight-alert-card insight-caution" role="alert">
-              <div class="insight-alert-icon icon-caution" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                  <path d="M12 9v4" />
-                  <path d="M12 17h.01" />
-                </svg>
-              </div>
-              <div class="insight-alert-content">
-                <p class="insight-alert-title">Upcoming payments close to available cash</p>
-                <p class="insight-alert-body">You have &#8377;11,700 in payments due over the next 7 days, while your
-                  available cash is &#8377;8,250. Your pending settlement of &#8377;7,800 may need to arrive before some
-                  of these payments are due.</p>
-              </div>
-            </div>
+            <!-- Dynamically populated by CashlyAdvisor.render() -->
+          </div>
 
-            <div class="insight-alert-card insight-caution">
-              <div class="insight-alert-icon icon-caution" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-              </div>
-              <div class="insight-alert-content">
-                <p class="insight-alert-title">&#8377;7,800 still pending settlement</p>
-                <p class="insight-alert-body">A significant portion of your recent sales have not yet settled. UPI and
-                  card payments typically settle in 1–2 business days. Monitor this closely to ensure funds arrive before
-                  your supplier payment tomorrow.</p>
-              </div>
-            </div>
+          <!-- Why This Number? Explanations -->
+          <h2 style="font-size:var(--text-md);font-weight:var(--fw-semibold);color:var(--c-text-primary);margin-bottom:var(--sp-3);margin-top:var(--sp-6);">
+            Why This Number? — Formula Explanations
+          </h2>
+
+          <div id="insights-why-numbers-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--sp-3);margin-bottom:var(--sp-6);">
+            <!-- Dynamically populated by CashlyAdvisor.render() -->
+          </div>
+
+          <!-- Cashflow Trends & Spending Insights -->
+          <h2 style="font-size:var(--text-md);font-weight:var(--fw-semibold);color:var(--c-text-primary);margin-bottom:var(--sp-3);">
+            Cashflow Trends &amp; Spending Insights
+          </h2>
+
+          <div id="insights-trends-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--sp-3);margin-bottom:var(--sp-6);">
+            <!-- Dynamically populated by CashlyAdvisor.render() -->
           </div>
 
         </section>

@@ -237,7 +237,45 @@ Cashflow Engine (Available Cash, Safe to Spend, Runways, Alerts)
 
 ---
 
-## 7. Local Development Setup
+## 7. Cashly Advisor 2.0 (Explainable Financial Intelligence)
+
+Cashly Advisor transforms raw balance figures into a practical, transparent decision-support system. It operates deterministically without external generative AI APIs (such as OpenAI/ChatGPT), guaranteeing zero hallucinations and instant, offline-capable calculations.
+
+### Distinct System Responsibilities
+
+| System | Module | Responsibility |
+| :--- | :--- | :--- |
+| **Cashflow Engine** | `js/data.js` | Calculates current financial state (Available Cash, Pending Settlements, Safe to Spend). |
+| **Cashflow Intelligence** | `js/cashflow.js` | Forecasts future state (7-day/30-day projections, burn rates, runway). |
+| **Alert Engine** | `js/alerts.js` | Detects events, creates alerts, manages badge indicators and dismiss states. |
+| **Cashly Advisor** | `js/advisor.js` | Explains why numbers exist and generates prioritized, actionable recommendations. |
+
+### Practical Recommendation Rules
+
+1. **Low Safe to Spend**: Warns when safe spending margin is compressed, breaking down liquid cash vs obligations and the 15% safety cushion.
+2. **High Pending Settlement**: Flags when excessive sales are locked in 1–2 day digital settlement cycles.
+3. **Upcoming Obligation**: Highlights the most urgent supplier/rent/wage due date and assesses liquid coverage.
+4. **Forecasted Cash Shortage**: Warns if the 7-day or 30-day projection dips below safe operating floors.
+5. **High Expense Trend**: Compares recent 3-day daily spending against historical baseline to flag accelerating overhead.
+6. **Large Expense Detected**: Identifies single transactions running $> 2.5\times$ above normal daily expense baseline.
+7. **Healthy Cash Position**: Confirms when settled reserves comfortably cover obligations with positive safe-to-spend buffer.
+
+### Priority System & Sorting
+- `High Priority`: Immediate cashflow threats (forecasted shortage, overdue bills, zero safe-to-spend).
+- `Medium Priority`: Impending payment due dates, high pending settlement ratios, or rising expense velocity.
+- `Low Priority`: Healthy operational status, informational trends, or low-data empty state.
+- `CashlyAdvisor.getTopRecommendation()` dynamically surfaces the single most critical decision to the Dashboard.
+
+### "Why This Number?" Explainability
+Directly exposes mathematical formulas across core metrics:
+- **Safe to Spend**: $\text{Available Cash} - \text{Obligation Reserve} - \text{Safety Buffer (15\%)} = \text{Safe to Spend}$
+- **Available Cash**: $\text{Settled Inflows} + \text{Base Float} - \text{Total Outflows} = \text{Available Cash}$
+- **Cash Health**: Evaluated via liquid coverage ratio and runway survival days.
+- **7-Day Forecast**: $\text{Starting Cash} + \text{Expected Inflows} - \text{Expected Outflows} = \text{Day 7 Cash}$
+
+---
+
+## 8. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -271,7 +309,7 @@ Cashflow Engine (Available Cash, Safe to Spend, Runways, Alerts)
 
 ---
 
-## 8. Deployment (Vercel / Netlify)
+## 9. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -283,7 +321,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 9. Current Limitations
+## 10. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -291,6 +329,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 10. License
+## 11. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

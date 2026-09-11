@@ -118,7 +118,13 @@ const Dashboard = (() => {
     // Update live values in advisor card if present
     const advisorMsg = document.querySelector('.advisor-message');
     if (advisorMsg) {
-      if (s.isAccountConnected) {
+      const topRec = (typeof CashlyAdvisor !== 'undefined' && typeof CashlyAdvisor.getTopRecommendation === 'function')
+        ? CashlyAdvisor.getTopRecommendation()
+        : null;
+
+      if (topRec && topRec.type !== 'empty') {
+        advisorMsg.textContent = `${topRec.title}: ${topRec.message} ${topRec.action}`;
+      } else if (s.isAccountConnected) {
         advisorMsg.textContent = `Your cash looks stable, with ${fmt(s.pendingSettlement)} in digital sales pending settlement. Auto Sync is active across UPI, Card, and Bank feeds.`;
       } else {
         advisorMsg.textContent = 'Connect your digital account to automatically track incoming UPI, Card, and Bank settlements without manual entry.';
