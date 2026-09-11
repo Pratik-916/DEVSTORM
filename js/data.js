@@ -797,16 +797,14 @@ const AppState = (() => {
     return false;
   }
 
-  /* ---- Derived summary metrics ---- */
-
   /**
    * Compute comprehensive financial metrics strictly from centralized transaction store:
    * 1. Total Sales = All sales (Settled Cash + Settled Digital + Pending Digital)
    * 2. Available Cash = Settled sales + Base float - Total Expenses (Pending digital sales NOT included)
    * 3. Pending Settlement = Unsettled digital sales (UPI, Card, Credit)
    * 4. Total Expenses = All expenses & personal withdrawals
-   * 5. Safe to Spend = Available Cash reduced by upcoming obligations
-   * 6. Cash Health = Simple evaluated status: 'healthy' | 'caution' | 'risk'
+   * 5. Safe to Spend = Available Cash minus obligation reserve and safety buffer (from CashflowIntelligence)
+   * 6. Cash Health = Multi-factor evaluated status: 'healthy' | 'caution' | 'risk' (from CashflowIntelligence)
    */
   function getSummary() {
     const txns = _store.transactions;
@@ -835,36 +833,52 @@ const AppState = (() => {
     const baseFloat = _store.business.initialCashBalance || 800;
     const availableCash = Math.max(0, (settledSales + baseFloat) - totalExpenses);
 
-    // Upcoming obligations: due payments from payment schedule
+    // Upcoming obligations: all due/overdue from payment schedule
     const upcomingObligations = _store.payments
-      .filter(p => p.status === PAYMENT_STATUSES.DUE || p.status === 'due')
+      .filter(p => p.status !== 'paid')
       .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-    // Near-term essential obligations (e.g. rent / immediate essential due)
-    const essentialObligations = _store.payments
-      .filter(p => (p.status === PAYMENT_STATUSES.DUE || p.status === 'due') && (p.priority === PAYMENT_PRIORITIES.ESSENTIAL || p.priority === 'essential'))
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-    // Safe to Spend: Available cash reduced by obligations
-    const obligationDeduction = essentialObligations > 0 ? essentialObligations : Math.round(upcomingObligations * 0.6);
-    const safeToSpend = Math.max(0, availableCash - obligationDeduction);
 
     // Breakdown metrics by source
     const autoTransactionsCount = txns.filter(t => t.source === TRANSACTION_SOURCES.AUTO).length;
     const manualTransactionsCount = txns.filter(t => t.source === TRANSACTION_SOURCES.MANUAL).length;
 
-    // Cash Health: Healthy / Caution / At Risk
-    // Healthy: Available cash covers upcoming obligations comfortably (or safeToSpend >= 3000)
-    // Caution: Available cash covers at least 50% of upcoming obligations
-    // At Risk: Available cash covers less than 50% of upcoming obligations or <= 0
-    let cashHealth;
-    const coverageRatio = upcomingObligations > 0 ? (availableCash / upcomingObligations) : 1;
-    if (coverageRatio >= 0.85 || safeToSpend >= 3000) {
-      cashHealth = 'healthy';
-    } else if (coverageRatio >= 0.45) {
-      cashHealth = 'caution';
+    // Use CashflowIntelligence for improved safeToSpend and cashHealth if available
+    let safeToSpend, cashHealth;
+    if (typeof CashflowIntelligence !== 'undefined') {
+      // We must temporarily return base values for CashflowIntelligence to use
+      // (avoids circular dependency — we pass data directly)
+      const payments = _store.payments.filter(p => p.status !== 'paid');
+      const essentialDue = payments
+        .filter(p => p.priority === 'essential' || p.priority === 'high')
+        .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const obligationReserve = essentialDue > 0 ? essentialDue : Math.round(upcomingObligations * 0.6);
+      const safetyBuffer = Math.round(availableCash * 0.15);
+      safeToSpend = Math.max(0, availableCash - obligationReserve - safetyBuffer);
+
+      // Multi-factor cash health
+      const netDailyBurn = 0; // Will be computed in CashflowIntelligence for runway
+      if (availableCash <= 0 || safeToSpend <= 0 || availableCash < upcomingObligations * 0.5) {
+        cashHealth = 'risk';
+      } else if (availableCash >= upcomingObligations * 1.5 && safeToSpend >= 3000) {
+        cashHealth = 'healthy';
+      } else if (upcomingObligations === 0 && safeToSpend >= 2000) {
+        cashHealth = 'healthy';
+      } else if (availableCash >= upcomingObligations * 0.75) {
+        cashHealth = 'caution';
+      } else {
+        cashHealth = 'risk';
+      }
     } else {
-      cashHealth = 'risk';
+      // Fallback: classic calculation
+      const essentialObligations = _store.payments
+        .filter(p => (p.status === 'due' || p.status === 'overdue') && (p.priority === 'essential'))
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const obligationDeduction = essentialObligations > 0 ? essentialObligations : Math.round(upcomingObligations * 0.6);
+      safeToSpend = Math.max(0, availableCash - obligationDeduction);
+      const coverageRatio = upcomingObligations > 0 ? (availableCash / upcomingObligations) : 1;
+      cashHealth = coverageRatio >= 0.85 || safeToSpend >= 3000 ? 'healthy'
+        : coverageRatio >= 0.45 ? 'caution'
+        : 'risk';
     }
 
     return {
@@ -887,74 +901,31 @@ const AppState = (() => {
     return { ..._store.business };
   }
 
-  /* ---- Dynamic 7-Day Forecast ---- */
+  /* ---- Dynamic Forecast (delegated to CashflowIntelligence) ---- */
   function getForecast() {
-    const summary = getSummary();
-    const availableCash = summary.availableCash;
-    const pendingSettlement = summary.pendingSettlement;
-    const payments = getPayments().filter(p => p.status === PAYMENT_STATUSES.DUE);
-
-    const labels = ['Today', 'Tomorrow', 'Day 3', 'Day 4 (Fri)', 'Day 5', 'Day 6', 'Day 7'];
-
-    // Map obligations to 7-day projection buckets
-    const dailyObligations = [0, 0, 0, 0, 0, 0, 0];
-    payments.forEach(p => {
-      let dayIdx = -1;
-      const lbl = (p.dueDateLabel || '').toLowerCase();
-      if (lbl.includes('tomorrow')) dayIdx = 1;
-      else if (lbl.includes('3 days')) dayIdx = 2;
-      else if (lbl.includes('4 days') || lbl.includes('fri')) dayIdx = 3;
-      else if (lbl.includes('5 days')) dayIdx = 4;
-      else if (lbl.includes('6 days')) dayIdx = 5;
-      else if (lbl.includes('7 days')) dayIdx = 6;
-      else {
-        dayIdx = 3; // default mid-week
-      }
-
-      if (dayIdx >= 0 && dayIdx < 7) {
-        dailyObligations[dayIdx] += p.amount;
-      }
-    });
-
-    // Scheduled settlement inflows (settles over T+1 and T+2):
-    // Tomorrow: 60% of pending settlement
-    // Day 3: 40% of pending settlement
-    const dailySettlements = [
-      0,
-      Math.round(pendingSettlement * 0.6),
-      Math.round(pendingSettlement * 0.4),
-      0, 0, 0, 0
-    ];
-
-    // Estimated daily organic counter cash inflow from business activity
-    const avgDailyCashSales = Math.round((summary.settledSales || 4000) / 4) || 1500;
-
-    // Project running available cash curve
-    const values = [];
-    let runningCash = availableCash;
-
-    for (let day = 0; day < 7; day++) {
-      if (day === 0) {
-        values.push(runningCash);
-      } else {
-        runningCash = runningCash + dailySettlements[day] + avgDailyCashSales - dailyObligations[day];
-        values.push(Math.max(500, runningCash));
-      }
+    if (typeof CashflowIntelligence !== 'undefined') {
+      return CashflowIntelligence.getForecast7Day();
     }
-
-    // Determine lowest point in 7 days
-    const lowestVal = Math.min(...values);
-    const lowestIdx = values.indexOf(lowestVal);
-    const lowestLabel = labels[lowestIdx];
-
+    // Fallback: simple 7-day forecast
+    const summary = getSummary();
+    const labels = ['Today', 'Tomorrow', 'Day 3', 'Day 4 (Fri)', 'Day 5', 'Day 6', 'Day 7'];
+    const values = labels.map((_, i) => Math.max(500, summary.availableCash - i * 200));
     return {
       labels,
       values,
-      lowestPoint: {
-        value: lowestVal,
-        label: lowestLabel,
-      },
+      lowestPoint: { value: values[values.length - 1], label: labels[labels.length - 1] },
     };
+  }
+
+  /**
+   * Get full cashflow intelligence (for Insights page).
+   * Returns avg daily income/expenses, expected flows, runway, and 7-day forecast.
+   */
+  function getIntelligence() {
+    if (typeof CashflowIntelligence !== 'undefined') {
+      return CashflowIntelligence.getIntelligence();
+    }
+    return null;
   }
 
   /* ---- Feed & Sync ---- */
@@ -1063,6 +1034,7 @@ const AppState = (() => {
     getSummary,
     getBusiness,
     getForecast,
+    getIntelligence,
     getFeedStatus,
     syncFeed,
     formatCurrency,

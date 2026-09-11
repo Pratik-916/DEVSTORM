@@ -104,6 +104,54 @@ const Advisor = (() => {
   }
 
   /**
+   * Render cashflow intelligence metrics on the Insights page.
+   */
+  function renderIntelligence(s) {
+    const intel = (typeof AppState !== 'undefined' && typeof AppState.getIntelligence === 'function')
+      ? AppState.getIntelligence()
+      : null;
+
+    if (!intel) return;
+
+    const fmt = (typeof AppState !== 'undefined') ? AppState.formatCurrency : (v) => '₹' + Number(v).toLocaleString('en-IN');
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    setText('intel-avg-daily-income', fmt(intel.avgDailyIncome));
+    setText('intel-avg-daily-expenses', fmt(intel.avgDailyExpenses));
+    setText('intel-expected-incoming', fmt(intel.expectedIncoming));
+    setText('intel-expected-outgoing', fmt(intel.expectedOutgoing));
+    setText('intel-projected-ending', fmt(intel.projectedEndingCash));
+
+    const runwayEl = document.getElementById('intel-cash-runway');
+    const runwayBadge = document.getElementById('intel-runway-badge');
+    if (runwayEl) {
+      runwayEl.textContent = intel.cashRunwayDays >= 90 ? '90+ days' : `${intel.cashRunwayDays} days`;
+    }
+    if (runwayBadge) {
+      if (intel.cashRunwayDays >= 30) {
+        runwayBadge.className = 'badge badge-healthy';
+        runwayBadge.textContent = 'Healthy';
+      } else if (intel.cashRunwayDays >= 14) {
+        runwayBadge.className = 'badge badge-caution';
+        runwayBadge.textContent = 'Monitor';
+      } else {
+        runwayBadge.className = 'badge badge-risk';
+        runwayBadge.textContent = 'At Risk';
+      }
+    }
+
+    // Safety buffer explanation note
+    const explainEl = document.getElementById('intel-explanation');
+    if (explainEl && intel.explanation) {
+      explainEl.textContent = `Safe to Spend: ${intel.explanation.safeToSpend}. ${intel.explanation.runway}`;
+    }
+  }
+
+  /**
    * Render the recommendations and update top metric cards on the Insights page.
    */
   function render() {
@@ -136,7 +184,10 @@ const Advisor = (() => {
     const safeVal = document.getElementById('insight-safe-to-spend');
     if (safeVal) safeVal.textContent = fmt(s.safeToSpend);
 
-    // 2. Render dynamic recommendation cards
+    // 2. Render cashflow intelligence metrics
+    renderIntelligence(s);
+
+    // 3. Render dynamic recommendation cards
     const container = document.getElementById('insights-recommendations-container');
     if (!container) return;
 
@@ -176,6 +227,7 @@ const Advisor = (() => {
   return {
     init,
     render,
+    renderIntelligence,
     generateRecommendations,
   };
 })();

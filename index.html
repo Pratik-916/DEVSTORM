@@ -866,6 +866,50 @@
             </div>
           </div>
 
+          <!-- Cash Intelligence Summary for Reports -->
+
+          <div class="card card-pad" style="margin-top:var(--sp-4);">
+            <p class="section-title" style="margin-bottom:var(--sp-3);">Cashflow Intelligence</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:var(--sp-4);">
+              <div>
+                <p style="font-size:var(--text-xs);color:var(--c-text-muted);margin-bottom:2px;">Avg Daily Income</p>
+                <p style="font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--c-primary);" id="report-avg-daily-income">—</p>
+              </div>
+              <div>
+                <p style="font-size:var(--text-xs);color:var(--c-text-muted);margin-bottom:2px;">Avg Daily Expenses</p>
+                <p style="font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--c-danger,#ef4444);" id="report-avg-daily-expenses">—</p>
+              </div>
+              <div>
+                <p style="font-size:var(--text-xs);color:var(--c-text-muted);margin-bottom:2px;">Expected Incoming (7d)</p>
+                <p style="font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--c-text-primary);" id="report-expected-incoming">—</p>
+              </div>
+              <div>
+                <p style="font-size:var(--text-xs);color:var(--c-text-muted);margin-bottom:2px;">Expected Outgoing (7d)</p>
+                <p style="font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--c-text-primary);" id="report-expected-outgoing">—</p>
+              </div>
+              <div>
+                <p style="font-size:var(--text-xs);color:var(--c-text-muted);margin-bottom:2px;">Cash Runway</p>
+                <p style="font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--c-text-primary);" id="report-cash-runway">—</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 30-Day Cash Forecast -->
+          <div class="reports-chart-card" style="margin-top:var(--sp-4);">
+            <div class="section-header" style="margin-bottom:0;">
+              <div>
+                <p class="section-title">30-Day Cash Forecast</p>
+                <p class="section-subtitle">Projected available cash over the next 30 days</p>
+              </div>
+            </div>
+            <div class="reports-chart-wrap" style="height:200px;">
+              <canvas id="forecast-30d-chart" aria-label="30-day cash forecast chart" role="img"></canvas>
+            </div>
+            <div class="forecast-note" id="forecast-30d-note" aria-live="polite" style="margin-top:var(--sp-3);">
+              <!-- populated by reports.js -->
+            </div>
+          </div>
+
         </section>
         <!-- /PAGE: REPORTS -->
 
@@ -912,6 +956,46 @@
               <span class="badge badge-healthy">After obligations</span>
             </div>
           </div>
+
+          <!-- Cash Flow Intelligence Metrics -->
+          <h2 id="cashflow-intel-heading"
+            style="font-size:var(--text-md);font-weight:var(--fw-semibold);color:var(--c-text-primary);margin-bottom:var(--sp-3);margin-top:var(--sp-6);">
+            7-Day Cash Intelligence</h2>
+          <div class="insight-grid" role="list" aria-label="Cash flow intelligence metrics" id="insight-intel-grid">
+            <div class="insight-card" role="listitem">
+              <p class="insight-card-label">Avg Daily Income</p>
+              <p class="insight-card-value" id="intel-avg-daily-income">—</p>
+              <span class="badge badge-healthy">Per day</span>
+            </div>
+            <div class="insight-card" role="listitem">
+              <p class="insight-card-label">Avg Daily Expenses</p>
+              <p class="insight-card-value" id="intel-avg-daily-expenses">—</p>
+              <span class="badge badge-pending">Per day</span>
+            </div>
+            <div class="insight-card" role="listitem">
+              <p class="insight-card-label">Expected Incoming</p>
+              <p class="insight-card-value" id="intel-expected-incoming" style="color:var(--c-primary);">—</p>
+              <span class="badge badge-healthy">7 days</span>
+            </div>
+            <div class="insight-card" role="listitem">
+              <p class="insight-card-label">Expected Outgoing</p>
+              <p class="insight-card-value" id="intel-expected-outgoing" style="color:var(--c-danger,#ef4444);">—</p>
+              <span class="badge badge-high">7 days</span>
+            </div>
+            <div class="insight-card" role="listitem">
+              <p class="insight-card-label">Projected Ending Cash</p>
+              <p class="insight-card-value" id="intel-projected-ending">—</p>
+              <span class="badge badge-caution">Day 7</span>
+            </div>
+            <div class="insight-card" role="listitem">
+              <p class="insight-card-label">Cash Runway</p>
+              <p class="insight-card-value" id="intel-cash-runway">—</p>
+              <span class="badge" id="intel-runway-badge">days</span>
+            </div>
+          </div>
+
+          <!-- Safety Buffer Note -->
+          <p id="intel-explanation" style="font-size:var(--text-xs);color:var(--c-text-muted);margin-bottom:var(--sp-4);line-height:1.6;"></p>
 
           <!-- Insight cards -->
           <h2
@@ -1942,6 +2026,8 @@
 
   <!-- data.js — Cashflow Engine & AppState -->
   <script src="js/data.js"></script>
+  <!-- Cashflow Intelligence Engine -->
+  <script src="js/cashflow.js"></script>
   <script src="js/router.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/transactions.js"></script>

@@ -56,8 +56,10 @@ const Router = (() => {
       if (!initialised.reports && typeof Reports !== 'undefined') {
         initialised.reports = true;
         Reports.initChart();
+        Reports.init30DayChart();
       } else if (typeof Reports !== 'undefined') {
         Reports.renderMetrics();
+        Reports.init30DayChart();
       }
     }
 
