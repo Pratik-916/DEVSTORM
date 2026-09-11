@@ -384,15 +384,36 @@ const DigitalFeedProvider = (() => {
 const AppState = (() => {
   // Internal store
   const _store = {
+    currentUser: null,
     transactions: [],
     payments: [],
     business: { ...BUSINESS },
     syncStatus: DigitalFeedProvider.getStatus(),
   };
 
+  function setCurrentUser(user) {
+    _store.currentUser = user;
+    if (typeof SupabaseService !== 'undefined') {
+      SupabaseService.setUser(user);
+    }
+  }
+
+  function getCurrentUser() {
+    return _store.currentUser;
+  }
+
+  function reset() {
+    _store.transactions = [];
+    _store.currentUser = null;
+    refreshAllViews();
+  }
+
   /* ---- Init: load base manual seed data or Supabase data ---- */
   function init() {
-    _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({ ...t }));
+    _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({
+      ...t,
+      userId: _store.currentUser ? _store.currentUser.id : null,
+    }));
     _store.payments     = SEED_PAYMENTS.map(p => ({ ...p }));
 
     // Listen to feed status updates
@@ -423,8 +444,12 @@ const AppState = (() => {
         refreshAllViews();
         console.log(`[Cashly] Loaded ${supaTxns.length} transactions from Supabase.`);
       } else if (supaTxns && supaTxns.length === 0) {
-        // First-time sync: seed initial transactions to Supabase
-        console.log('[Cashly] Seeding initial transactions to Supabase...');
+        // First-time sync for this user: seed initial transactions to Supabase with user_id
+        console.log('[Cashly] Seeding initial transactions to Supabase for user...');
+        const user = _store.currentUser;
+        if (user && user.id) {
+          _store.transactions.forEach(t => { t.userId = user.id; });
+        }
         await SupabaseService.insertTransactions(_store.transactions);
       }
     } catch (err) {
@@ -436,9 +461,13 @@ const AppState = (() => {
   function connectAccountDemo() {
     return DigitalFeedProvider.connectAccount((batchToImport) => {
       // Import the 5 digital transactions
+      const user = _store.currentUser;
       batchToImport.forEach(txn => {
         if (!_store.transactions.some(t => t.id === txn.id)) {
-          _store.transactions.unshift({ ...txn });
+          _store.transactions.unshift({
+            ...txn,
+            userId: user ? user.id : null,
+          });
         }
       });
 
@@ -513,6 +542,7 @@ const AppState = (() => {
 
     const newTxn = {
       id: 'txn-' + Date.now(),
+      userId: txnData.userId || (_store.currentUser ? _store.currentUser.id : null),
       source: source,
       type: txnData.type || TRANSACTION_TYPES.SALE,
       amount: Number(txnData.amount) || 0,
@@ -549,6 +579,7 @@ const AppState = (() => {
       _store.transactions[idx] = {
         ..._store.transactions[idx],
         ...updatedData,
+        userId: _store.transactions[idx].userId || (_store.currentUser ? _store.currentUser.id : null),
         amount: Number(updatedData.amount !== undefined ? updatedData.amount : _store.transactions[idx].amount),
       };
 
@@ -852,6 +883,9 @@ const AppState = (() => {
 
   return {
     init,
+    setCurrentUser,
+    getCurrentUser,
+    reset,
     connectAccountDemo,
     disconnectAccountDemo,
     getTransactions,

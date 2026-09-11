@@ -23,9 +23,59 @@
 <body>
 
   <!-- ============================================================
+     AUTH CONTAINER (LOGIN / SIGN UP)
+     ============================================================ -->
+  <div id="auth-screen" class="auth-screen" style="display:flex;">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-logo-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+            <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+          </svg>
+        </div>
+        <h1 class="auth-title">Cashly</h1>
+        <p class="auth-subtitle">Know your cash. Make smarter moves.</p>
+      </div>
+
+      <!-- Auth Tabs -->
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true">Sign In</button>
+        <button type="button" class="auth-tab" id="auth-tab-signup" role="tab" aria-selected="false">Sign Up</button>
+      </div>
+
+      <!-- Alert Box -->
+      <div id="auth-alert" class="auth-alert" style="display:none;" role="alert"></div>
+
+      <!-- Form -->
+      <form id="auth-form" class="auth-form" novalidate>
+        <div class="form-group" style="margin-bottom:var(--sp-4);">
+          <label class="form-label" for="auth-email">Email Address</label>
+          <input type="email" id="auth-email" class="form-input" placeholder="vendor@example.com" required autocomplete="email" />
+        </div>
+
+        <div class="form-group" style="margin-bottom:var(--sp-4);">
+          <label class="form-label" for="auth-password">Password</label>
+          <input type="password" id="auth-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" minlength="6" />
+          <span class="form-hint" id="auth-password-hint" style="display:none; font-size:11px; color:var(--c-text-muted); margin-top:4px;">Minimum 6 characters</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="auth-submit-btn" style="width:100%; justify-content:center; padding:12px; font-size:var(--text-md); margin-top:var(--sp-2);">
+          <span id="auth-btn-text">Sign In</span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p id="auth-toggle-prompt">Don't have an account? <a href="#" id="auth-switch-link">Sign Up</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
      APP SHELL
      ============================================================ -->
-  <div class="app-shell">
+  <div class="app-shell" style="display:none;">
 
     <!-- ============================================================
        DESKTOP SIDEBAR
@@ -1176,6 +1226,36 @@
             </div>
           </div>
 
+          <!-- Account & Session -->
+          <div class="settings-group">
+            <p class="settings-group-label">Account &amp; Session</p>
+            <div class="settings-row" tabindex="0" aria-label="Current signed in user">
+              <div class="settings-row-left">
+                <div class="settings-row-icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div>
+                  <p class="settings-row-label">Signed in as</p>
+                  <p class="settings-row-desc" id="settings-user-email">demo@cashly.local</p>
+                </div>
+              </div>
+              <div class="settings-row-right">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-settings-logout" style="color:var(--c-danger); border-color:rgba(239,68,68,0.3);">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  Log Out
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- About -->
           <div class="settings-group">
             <p class="settings-group-label">About</p>
@@ -1921,6 +2001,7 @@
   <script src="js/settings.js"></script>
   <script src="js/advisor.js"></script>
   <script src="js/admin.js"></script>
+  <script src="js/auth.js"></script>
 
   <!-- Init toggle switch thumbs (ensure thumb element exists in all toggles) -->
   <script>

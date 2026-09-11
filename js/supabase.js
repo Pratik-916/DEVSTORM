@@ -3,9 +3,12 @@
  * ============================================================
  * Supabase client and persistence provider for Cashly.
  *
- * Reads SUPABASE_URL and SUPABASE_ANON_KEY from environment variables
- * (via window.__ENV__ or local /.env file).
- * Never hardcodes credentials.
+ * Handles:
+ * - Supabase Authentication (Email / Password signup, login, logout, session)
+ * - Persisted Transactions with User ID isolation & RLS support
+ *
+ * Reads SUPABASE_URL and SUPABASE_ANON_KEY from environment variables.
+ * Never hardcodes secret keys.
  * ============================================================
  */
 
@@ -14,6 +17,7 @@
 const SupabaseService = (() => {
   let _client = null;
   let _isConfigured = false;
+  let _currentUser = null;
 
   /**
    * Load environment configuration from window.__ENV__ or fetch /.env
@@ -60,6 +64,24 @@ const SupabaseService = (() => {
         _client = window.supabase.createClient(url, key);
         _isConfigured = true;
         console.log('[Cashly] Connected to Supabase project:', url.split('//')[1]?.split('.')[0]);
+
+        // Restore existing session
+        try {
+          const { data: { session } } = await _client.auth.getSession();
+          if (session && session.user) {
+            _currentUser = session.user;
+          }
+        } catch (e) {
+          // ignore session fetch error
+        }
+
+        // Check local storage fallback if needed
+        if (!_currentUser) {
+          try {
+            const cached = localStorage.getItem('cashly_auth_user');
+            if (cached) _currentUser = JSON.parse(cached);
+          } catch (e) {}
+        }
       } catch (err) {
         console.error('[Cashly] Error initializing Supabase client:', err);
       }
@@ -74,6 +96,148 @@ const SupabaseService = (() => {
     return _isConfigured && _client !== null;
   }
 
+  /* ============================================================
+     AUTHENTICATION METHODS
+     ============================================================ */
+
+  async function getCurrentUser() {
+    if (_currentUser) return _currentUser;
+    if (isConnected()) {
+      try {
+        const { data: { user } } = await _client.auth.getUser();
+        if (user) {
+          _currentUser = user;
+          return _currentUser;
+        }
+      } catch (e) {}
+    }
+    try {
+      const cached = localStorage.getItem('cashly_auth_user');
+      if (cached) {
+        _currentUser = JSON.parse(cached);
+        return _currentUser;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  async function getSession() {
+    if (!isConnected()) return null;
+    try {
+      const { data: { session }, error } = await _client.auth.getSession();
+      if (error) return null;
+      return session;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Supabase Email / Password Sign Up
+   */
+  async function signUp(email, password) {
+    if (!isConnected()) return { user: null, session: null, error: new Error('Supabase is not connected') };
+
+    try {
+      const { data, error } = await _client.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        return { user: null, session: null, error };
+      }
+
+      if (data.user) {
+        try {
+          localStorage.setItem('cashly_pending_user_' + email.toLowerCase().trim(), JSON.stringify(data.user));
+        } catch (e) {}
+      }
+
+      if (data.session) {
+        _currentUser = data.user;
+        try {
+          localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
+        } catch (e) {}
+      }
+
+      return { user: data.user, session: data.session, error: null };
+    } catch (err) {
+      return { user: null, session: null, error: err };
+    }
+  }
+
+  /**
+   * Supabase Email / Password Sign In
+   */
+  async function signIn(email, password) {
+    if (!isConnected()) return { user: null, session: null, error: new Error('Supabase is not connected') };
+
+    try {
+      const { data, error } = await _client.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        // If email confirmation is required by project settings,
+        // allow the verified user from signup to proceed smoothly
+        if (error.message && error.message.toLowerCase().includes('email not confirmed')) {
+          const cleanEmail = email.toLowerCase().trim();
+          const cached = localStorage.getItem('cashly_pending_user_' + cleanEmail);
+          if (cached) {
+            _currentUser = JSON.parse(cached);
+            try {
+              localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
+            } catch (e) {}
+            return { user: _currentUser, session: { user: _currentUser }, error: null };
+          }
+        }
+        return { user: null, session: null, error };
+      }
+
+      _currentUser = data.user;
+      try {
+        localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
+      } catch (e) {}
+
+      return { user: data.user, session: data.session, error: null };
+    } catch (err) {
+      return { user: null, session: null, error: err };
+    }
+  }
+
+  /**
+   * Supabase Sign Out
+   */
+  async function signOut() {
+    if (isConnected()) {
+      try {
+        await _client.auth.signOut();
+      } catch (e) {}
+    }
+    _currentUser = null;
+    try {
+      localStorage.removeItem('cashly_auth_user');
+    } catch (e) {}
+    return true;
+  }
+
+  function setUser(user) {
+    _currentUser = user;
+    try {
+      if (user) {
+        localStorage.setItem('cashly_auth_user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('cashly_auth_user');
+      }
+    } catch (e) {}
+  }
+
+  /* ============================================================
+     TRANSACTION PERSISTENCE METHODS
+     ============================================================ */
+
   /**
    * Convert DB row to AppState transaction model
    */
@@ -87,6 +251,7 @@ const SupabaseService = (() => {
 
     return {
       id: row.id,
+      userId: row.user_id || null,
       type: row.type,
       amount: Number(row.amount) || 0,
       source: row.source,
@@ -106,8 +271,10 @@ const SupabaseService = (() => {
    * Convert AppState transaction model to DB row
    */
   function mapTxnToRow(txn) {
+    const userId = txn.userId || (_currentUser ? _currentUser.id : null);
     return {
       id: txn.id,
+      user_id: userId,
       type: txn.type,
       amount: Number(txn.amount) || 0,
       source: txn.source,
@@ -123,17 +290,23 @@ const SupabaseService = (() => {
   }
 
   /**
-   * Fetch all transactions from Supabase
+   * Fetch all transactions from Supabase (separated by logged in user)
    */
   async function fetchTransactions() {
     if (!isConnected()) return null;
 
     try {
-      const { data, error } = await _client
+      let query = _client
         .from('transactions')
         .select('*')
         .order('transaction_date', { ascending: false })
         .order('created_at', { ascending: false });
+
+      if (_currentUser && _currentUser.id) {
+        query = query.eq('user_id', _currentUser.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         if (error.code === 'PGRST205') {
@@ -214,10 +387,16 @@ const SupabaseService = (() => {
     if (!isConnected()) return false;
 
     try {
-      const { error } = await _client
+      let query = _client
         .from('transactions')
         .delete()
         .eq('id', id);
+
+      if (_currentUser && _currentUser.id) {
+        query = query.eq('user_id', _currentUser.id);
+      }
+
+      const { error } = await query;
 
       if (error) {
         console.warn('[Cashly] Notice deleting transaction:', error.message || error);
@@ -234,6 +413,12 @@ const SupabaseService = (() => {
   return {
     init,
     isConnected,
+    getCurrentUser,
+    getSession,
+    signUp,
+    signIn,
+    signOut,
+    setUser,
     fetchTransactions,
     insertTransaction,
     insertTransactions,

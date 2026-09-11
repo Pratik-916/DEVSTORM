@@ -1,11 +1,12 @@
 -- ============================================================
--- CASHLY — SUPABASE SCHEMA
+-- CASHLY — SUPABASE SCHEMA & ROW LEVEL SECURITY (RLS)
 -- Run this script in the Supabase SQL Editor (Dashboard -> SQL Editor)
 -- ============================================================
 
--- Create transactions table matching Cashly model
+-- 1. Create transactions table matching Cashly model
 CREATE TABLE IF NOT EXISTS public.transactions (
     id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     type TEXT NOT NULL CHECK (type IN ('sale', 'expense', 'withdrawal')),
     amount NUMERIC NOT NULL DEFAULT 0,
     source TEXT NOT NULL CHECK (source IN ('manual', 'auto')),
@@ -19,34 +20,54 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Enable Row Level Security (RLS)
+-- Ensure user_id column exists if table was already created earlier
+ALTER TABLE public.transactions 
+ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- 2. Enable Row Level Security (RLS)
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
--- Allow public access for Cashly demo app (no auth required)
+-- 3. Drop existing permissive policies
 DROP POLICY IF EXISTS "Allow public read access" ON public.transactions;
-CREATE POLICY "Allow public read access"
+DROP POLICY IF EXISTS "Allow public insert access" ON public.transactions;
+DROP POLICY IF EXISTS "Allow public update access" ON public.transactions;
+DROP POLICY IF EXISTS "Allow public delete access" ON public.transactions;
+
+DROP POLICY IF EXISTS "Users can select own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can insert own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can update own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can delete own transactions" ON public.transactions;
+
+-- 4. User-Level RLS Policies (Users can only access their own transactions)
+CREATE POLICY "Users can select own transactions"
 ON public.transactions
 FOR SELECT
-USING (true);
+TO authenticated
+USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Allow public insert access" ON public.transactions;
-CREATE POLICY "Allow public insert access"
+CREATE POLICY "Users can insert own transactions"
 ON public.transactions
 FOR INSERT
-WITH CHECK (true);
+TO authenticated
+WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Allow public update access" ON public.transactions;
-CREATE POLICY "Allow public update access"
+CREATE POLICY "Users can update own transactions"
 ON public.transactions
 FOR UPDATE
-USING (true)
-WITH CHECK (true);
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Allow public delete access" ON public.transactions;
-CREATE POLICY "Allow public delete access"
+CREATE POLICY "Users can delete own transactions"
 ON public.transactions
 FOR DELETE
-USING (true);
+TO authenticated
+USING (auth.uid() = user_id);
 
--- Index for speedy ordering by date
+-- 5. Indexes for fast user queries and ordering
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions (user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions (transaction_date DESC, created_at DESC);
+
+-- NOTE: If your Supabase project requires email confirmation for Sign In,
+-- you can auto-confirm emails in development by running:
+-- UPDATE auth.users SET email_confirmed_at = NOW() WHERE email_confirmed_at IS NULL;
