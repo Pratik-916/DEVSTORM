@@ -905,8 +905,8 @@
           <div class="insight-grid" role="list" aria-label="Key financial metrics">
             <div class="insight-card" role="listitem">
               <p class="insight-card-label">Cash Health</p>
-              <p class="insight-card-value" style="font-size:var(--text-xl);">Caution</p>
-              <span class="badge badge-caution">
+              <p class="insight-card-value" id="insight-cash-health" style="font-size:var(--text-xl);">Caution</p>
+              <span class="badge badge-caution" id="insight-health-badge">
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
                   aria-hidden="true">
@@ -919,17 +919,17 @@
             </div>
             <div class="insight-card" role="listitem">
               <p class="insight-card-label">Pending Settlements</p>
-              <p class="insight-card-value">&#8377;7,800</p>
-              <span class="badge badge-pending">UPI + Cards</span>
+              <p class="insight-card-value" id="insight-pending-settlements">&#8377;7,800</p>
+              <span class="badge badge-pending" id="insight-pending-badge">UPI + Cards</span>
             </div>
             <div class="insight-card" role="listitem">
               <p class="insight-card-label">Upcoming Obligations</p>
-              <p class="insight-card-value">&#8377;11,700</p>
+              <p class="insight-card-value" id="insight-upcoming-obligations">&#8377;11,700</p>
               <span class="badge badge-high">7 days</span>
             </div>
             <div class="insight-card" role="listitem">
               <p class="insight-card-label">Safe to Spend</p>
-              <p class="insight-card-value" style="color:var(--c-primary);">&#8377;3,250</p>
+              <p class="insight-card-value" id="insight-safe-to-spend" style="color:var(--c-primary);">&#8377;3,250</p>
               <span class="badge badge-healthy">After obligations</span>
             </div>
           </div>
@@ -939,66 +939,38 @@
             style="font-size:var(--text-md);font-weight:var(--fw-semibold);color:var(--c-text-primary);margin-bottom:var(--sp-3);">
             Observations</h2>
 
-          <div class="insight-alert-card insight-caution" role="alert">
-            <div class="insight-alert-icon icon-caution" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                <path d="M12 9v4" />
-                <path d="M12 17h.01" />
-              </svg>
+          <div id="insights-recommendations-container">
+            <div class="insight-alert-card insight-caution" role="alert">
+              <div class="insight-alert-icon icon-caution" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                  <path d="M12 9v4" />
+                  <path d="M12 17h.01" />
+                </svg>
+              </div>
+              <div class="insight-alert-content">
+                <p class="insight-alert-title">Upcoming payments close to available cash</p>
+                <p class="insight-alert-body">You have &#8377;11,700 in payments due over the next 7 days, while your
+                  available cash is &#8377;8,250. Your pending settlement of &#8377;7,800 may need to arrive before some
+                  of these payments are due.</p>
+              </div>
             </div>
-            <div class="insight-alert-content">
-              <p class="insight-alert-title">Upcoming payments close to available cash</p>
-              <p class="insight-alert-body">You have &#8377;11,700 in payments due over the next 7 days, while your
-                available cash is &#8377;8,250. Your pending settlement of &#8377;7,800 may need to arrive before some
-                of these payments are due.</p>
-            </div>
-          </div>
 
-          <div class="insight-alert-card insight-caution">
-            <div class="insight-alert-icon icon-caution" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            </div>
-            <div class="insight-alert-content">
-              <p class="insight-alert-title">&#8377;7,800 still pending settlement</p>
-              <p class="insight-alert-body">A significant portion of your recent sales have not yet settled. UPI and
-                card payments typically settle in 1–2 business days. Monitor this closely to ensure funds arrive before
-                your supplier payment tomorrow.</p>
-            </div>
-          </div>
-
-          <div class="insight-alert-card insight-healthy">
-            <div class="insight-alert-icon icon-healthy" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-                <polyline points="16 7 22 7 22 13" />
-              </svg>
-            </div>
-            <div class="insight-alert-content">
-              <p class="insight-alert-title">Sales trending up 12% this week</p>
-              <p class="insight-alert-body">Your total sales of &#8377;20,450 this month represent a 12% increase from
-                last week. If this trend continues, your cash position should improve after settlements arrive.</p>
-            </div>
-          </div>
-
-          <div class="insight-alert-card insight-healthy">
-            <div class="insight-alert-icon icon-healthy" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-            </div>
-            <div class="insight-alert-content">
-              <p class="insight-alert-title">Expenses are under control</p>
-              <p class="insight-alert-body">Your expenses of &#8377;5,200 represent about 25% of your total sales — a
-                healthy ratio for a small retail business. Continue monitoring non-essential expenses during the current
-                period.</p>
+            <div class="insight-alert-card insight-caution">
+              <div class="insight-alert-icon icon-caution" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+              <div class="insight-alert-content">
+                <p class="insight-alert-title">&#8377;7,800 still pending settlement</p>
+                <p class="insight-alert-body">A significant portion of your recent sales have not yet settled. UPI and
+                  card payments typically settle in 1–2 business days. Monitor this closely to ensure funds arrive before
+                  your supplier payment tomorrow.</p>
+              </div>
             </div>
           </div>
 
@@ -1781,6 +1753,7 @@
   <script src="js/addtransaction.js"></script>
   <script src="js/connectaccount.js"></script>
   <script src="js/settings.js"></script>
+  <script src="js/advisor.js"></script>
 
   <!-- Init toggle switch thumbs (ensure thumb element exists in all toggles) -->
   <script>

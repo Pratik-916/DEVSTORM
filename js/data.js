@@ -474,6 +474,9 @@ const AppState = (() => {
     if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') {
       Reports.renderMetrics();
     }
+    if (typeof Advisor !== 'undefined' && typeof Advisor.render === 'function') {
+      Advisor.render();
+    }
   }
 
   /* ---- Transactions ---- */
