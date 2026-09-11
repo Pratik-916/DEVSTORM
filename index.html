@@ -27,20 +27,22 @@
      ============================================================ -->
   <div id="auth-screen" class="auth-screen" style="display:flex;">
     <div class="auth-card">
+      
+      <!-- Brand Header -->
       <div class="auth-brand">
         <div class="auth-logo-icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
             <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
           </svg>
         </div>
         <h1 class="auth-title">Cashly</h1>
-        <p class="auth-subtitle">Know your cash. Make smarter moves.</p>
+        <p class="auth-subtitle">Real-Time Cashflow Intelligence for Vendors</p>
       </div>
 
-      <!-- Auth Tabs -->
-      <div class="auth-tabs" role="tablist">
+      <!-- Segmented Control (Sign In / Sign Up) -->
+      <div class="auth-tabs" role="tablist" aria-label="Authentication Options">
         <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true">Sign In</button>
         <button type="button" class="auth-tab" id="auth-tab-signup" role="tab" aria-selected="false">Sign Up</button>
       </div>
@@ -48,27 +50,64 @@
       <!-- Alert Box -->
       <div id="auth-alert" class="auth-alert" style="display:none;" role="alert"></div>
 
-      <!-- Form -->
+      <!-- Auth Form -->
       <form id="auth-form" class="auth-form" novalidate>
-        <div class="form-group" style="margin-bottom:var(--sp-4);">
-          <label class="form-label" for="auth-email">Email Address</label>
-          <input type="email" id="auth-email" class="form-input" placeholder="vendor@example.com" required autocomplete="email" />
+        <!-- Email Field -->
+        <div class="auth-field-group">
+          <label class="auth-label" for="auth-email">Business Email</label>
+          <div class="auth-input-wrapper">
+            <div class="auth-input-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+            </div>
+            <input type="email" id="auth-email" class="auth-input form-input" placeholder="vendor@business.com" required autocomplete="email" />
+          </div>
         </div>
 
-        <div class="form-group" style="margin-bottom:var(--sp-4);">
-          <label class="form-label" for="auth-password">Password</label>
-          <input type="password" id="auth-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" minlength="6" />
-          <span class="form-hint" id="auth-password-hint" style="display:none; font-size:11px; color:var(--c-text-muted); margin-top:4px;">Minimum 6 characters</span>
+        <!-- Password Field -->
+        <div class="auth-field-group">
+          <label class="auth-label" for="auth-password">Password</label>
+          <div class="auth-input-wrapper">
+            <div class="auth-input-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+            <input type="password" id="auth-password" class="auth-input form-input" placeholder="Enter your password" required autocomplete="current-password" minlength="6" />
+          </div>
+          <span class="auth-hint form-hint" id="auth-password-hint" style="display:none;">Must be at least 6 characters</span>
         </div>
 
-        <button type="submit" class="btn btn-primary" id="auth-submit-btn" style="width:100%; justify-content:center; padding:12px; font-size:var(--text-md); margin-top:var(--sp-2);">
+        <!-- Submit Button -->
+        <button type="submit" class="auth-submit-btn btn btn-primary" id="auth-submit-btn">
           <span id="auth-btn-text">Sign In</span>
+          <svg class="auth-btn-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" />
+            <polyline points="12 5 19 12 12 19" />
+          </svg>
         </button>
       </form>
 
+      <!-- Toggle Prompt Footer -->
       <div class="auth-footer">
         <p id="auth-toggle-prompt">Don't have an account? <a href="#" id="auth-switch-link">Sign Up</a></p>
       </div>
+
+      <!-- Trust Security Badge -->
+      <div class="auth-trust-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <span>Secured by Supabase Authentication &amp; 256-bit RLS Encryption</span>
+      </div>
+
     </div>
   </div>
 
