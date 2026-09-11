@@ -264,33 +264,60 @@ const SupabaseService = (() => {
             }
           },
           delete() {
-            return {
+            const delFilters = [];
+            const delBuilder = {
               eq(col, val) {
-                filters.push([col, val]);
-                return {
-                  eq(col2, val2) {
-                    filters.push([col2, val2]);
-                    return (async () => {
-                      let queryUrl = `${url}/rest/v1/${table}?`;
-                      queryUrl += filters.map(([c, v]) => `${c}=eq.${encodeURIComponent(v)}`).join('&');
-                      try {
-                        const res = await fetch(queryUrl, { method: 'DELETE', headers: authHeaders() });
-                        return { error: res.ok ? null : await res.json() };
-                      } catch (e) {
-                        return { error: e };
-                      }
-                    })();
-                  },
-                  then(resolve, reject) {
-                    let queryUrl = `${url}/rest/v1/${table}?`;
-                    queryUrl += filters.map(([c, v]) => `${c}=eq.${encodeURIComponent(v)}`).join('&');
-                    return fetch(queryUrl, { method: 'DELETE', headers: authHeaders() })
-                      .then(res => ({ error: res.ok ? null : true }))
-                      .then(resolve, reject);
-                  }
-                };
+                delFilters.push([col, val]);
+                return delBuilder;
+              },
+              async then(resolve, reject) {
+                let queryUrl = `${url}/rest/v1/${table}?`;
+                queryUrl += delFilters.map(([c, v]) => `${c}=eq.${encodeURIComponent(v)}`).join('&');
+                try {
+                  const res = await fetch(queryUrl, { method: 'DELETE', headers: authHeaders() });
+                  const out = { error: res.ok ? null : await res.json().catch(() => ({ message: 'Delete failed' })) };
+                  return resolve ? resolve(out) : out;
+                } catch (e) {
+                  return reject ? reject(e) : { error: e };
+                }
               }
             };
+            return delBuilder;
+          },
+          update(updates) {
+            const updFilters = [];
+            const updBuilder = {
+              eq(col, val) {
+                updFilters.push([col, val]);
+                return updBuilder;
+              },
+              async then(resolve, reject) {
+                let queryUrl = `${url}/rest/v1/${table}?`;
+                queryUrl += updFilters.map(([c, v]) => `${c}=eq.${encodeURIComponent(v)}`).join('&');
+                try {
+                  const res = await fetch(queryUrl, {
+                    method: 'PATCH',
+                    headers: {
+                      ...authHeaders(),
+                      'Content-Type': 'application/json',
+                      'Prefer': 'return=representation',
+                    },
+                    body: JSON.stringify(updates),
+                  });
+                  if (!res.ok) {
+                    const errData = await res.json().catch(() => ({ message: 'Update failed' }));
+                    const out = { data: null, error: errData };
+                    return resolve ? resolve(out) : out;
+                  }
+                  const data = await res.json().catch(() => null);
+                  const out = { data, error: null };
+                  return resolve ? resolve(out) : out;
+                } catch (e) {
+                  return reject ? reject(e) : { data: null, error: e };
+                }
+              }
+            };
+            return updBuilder;
           }
         };
       }
@@ -626,8 +653,119 @@ const SupabaseService = (() => {
         if (res && res.data && res.data[0]) {
           newBusiness = res.data[0];
         }
+
+        // Seed initial demo transactions and obligations in Supabase for this new business
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const initialTxns = [
+          {
+            id: 'txn-seed-1-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            user_id: user.id,
+            type: 'sale',
+            amount: 4500,
+            source: 'manual',
+            payment_method: 'cash',
+            settlement_status: 'settled',
+            category: 'sales',
+            channel: 'Counter Cash',
+            reference: 'CASH-REC-101',
+            description: 'Morning Cash Register Total',
+            transaction_date: todayStr,
+            created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+          },
+          {
+            id: 'txn-seed-2-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            user_id: user.id,
+            type: 'expense',
+            amount: 1500,
+            source: 'manual',
+            payment_method: 'cash',
+            settlement_status: 'settled',
+            category: 'stock',
+            channel: 'Counter Cash',
+            reference: 'EXP-CASH-044',
+            description: 'Stock Purchase - Fresh Produce',
+            transaction_date: todayStr,
+            created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+          },
+          {
+            id: 'txn-seed-3-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            user_id: user.id,
+            type: 'withdrawal',
+            amount: 500,
+            source: 'manual',
+            payment_method: 'cash',
+            settlement_status: 'settled',
+            category: 'personal',
+            channel: 'Personal Drawing',
+            reference: 'WD-OWNER-012',
+            description: 'Personal Withdrawal',
+            transaction_date: todayStr,
+            created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+          },
+          {
+            id: 'txn-seed-4-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            user_id: user.id,
+            type: 'sale',
+            amount: 6200,
+            source: 'manual',
+            payment_method: 'cash',
+            settlement_status: 'settled',
+            category: 'sales',
+            channel: 'Counter Cash',
+            reference: 'CASH-REC-102',
+            description: 'Evening Cash Register Total',
+            transaction_date: yesterdayStr,
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+          },
+        ];
+        await _client.from('transactions').insert(initialTxns);
+
+        const initialObligations = [
+          {
+            id: 'pay-seed-1-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            title: 'Supplier Payment',
+            amount: 3000,
+            due_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+            status: 'due',
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: 'pay-seed-2-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            title: 'Shop Rent',
+            amount: 5000,
+            due_date: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10),
+            status: 'due',
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: 'pay-seed-3-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            title: 'Staff Wages',
+            amount: 2500,
+            due_date: new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 10),
+            status: 'due',
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: 'pay-seed-4-' + newBusiness.id.slice(0, 8),
+            business_id: newBusiness.id,
+            title: 'Electricity & Utilities',
+            amount: 1200,
+            due_date: new Date(Date.now() + 86400000 * 6).toISOString().slice(0, 10),
+            status: 'due',
+            created_at: new Date().toISOString(),
+          },
+        ];
+        await _client.from('upcoming_obligations').insert(initialObligations);
       } catch (err) {
-        console.warn('[Cashly] Notice creating business profile in Supabase:', err.message || err);
+        console.warn('[Cashly] Notice creating business profile and initial seed in Supabase:', err.message || err);
       }
     }
 
@@ -827,6 +965,159 @@ const SupabaseService = (() => {
     }
   }
 
+  /**
+   * Update an existing transaction in Supabase
+   */
+  async function updateTransaction(id, updates) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const rowUpdates = {};
+      if (updates.type !== undefined) rowUpdates.type = updates.type;
+      if (updates.amount !== undefined) rowUpdates.amount = Number(updates.amount) || 0;
+      if (updates.source !== undefined) rowUpdates.source = updates.source;
+      if (updates.paymentMethod !== undefined) rowUpdates.payment_method = updates.paymentMethod;
+      if (updates.settlementStatus !== undefined) rowUpdates.settlement_status = updates.settlementStatus;
+      if (updates.category !== undefined) rowUpdates.category = updates.category;
+      if (updates.channel !== undefined) rowUpdates.channel = updates.channel;
+      if (updates.reference !== undefined) rowUpdates.reference = updates.reference;
+      if (updates.description !== undefined) rowUpdates.description = updates.description;
+      if (updates.date !== undefined) rowUpdates.transaction_date = updates.date;
+
+      let query = _client.from('transactions').update(rowUpdates).eq('id', id);
+
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      } else if (_currentUser && _currentUser.id) {
+        query = query.eq('user_id', _currentUser.id);
+      }
+
+      const { error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice updating transaction in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice updating transaction in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  /* ============================================================
+     UPCOMING OBLIGATIONS PERSISTENCE METHODS
+     ============================================================ */
+
+  function getDueDateLabel(dateStr) {
+    if (!dateStr) return 'Upcoming';
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const due = new Date(dateStr);
+      due.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((due - today) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Tomorrow';
+      if (diffDays > 1) return `In ${diffDays} days`;
+      if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`;
+    } catch (e) {}
+    return 'Upcoming';
+  }
+
+  function mapRowToObligation(row) {
+    return {
+      id: row.id,
+      businessId: row.business_id || null,
+      title: row.title,
+      amount: Number(row.amount) || 0,
+      dueDate: row.due_date,
+      dueDateLabel: getDueDateLabel(row.due_date),
+      status: row.status || 'due',
+      priority: 'essential',
+      category: 'other',
+      description: row.title,
+      createdAt: row.created_at || new Date().toISOString(),
+    };
+  }
+
+  function mapObligationToRow(ob) {
+    const businessId = ob.businessId || (_currentBusiness ? _currentBusiness.id : null);
+    return {
+      id: ob.id,
+      business_id: businessId,
+      title: ob.title,
+      amount: Number(ob.amount) || 0,
+      due_date: ob.dueDate || new Date().toISOString().slice(0, 10),
+      status: ob.status || 'due',
+      created_at: ob.createdAt || new Date().toISOString(),
+    };
+  }
+
+  async function fetchObligations() {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    try {
+      let query = _client.from('upcoming_obligations').select('*');
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      }
+      if (query && typeof query.order === 'function') {
+        query = query.order('due_date', { ascending: true });
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice fetching obligations from Supabase:', error.message || error);
+        return null;
+      }
+      return (data || []).map(mapRowToObligation);
+    } catch (err) {
+      console.warn('[Cashly] Notice fetching obligations from Supabase:', err.message || err);
+      return null;
+    }
+  }
+
+  async function insertObligation(ob) {
+    await ensureConnected();
+    if (!isConnected()) return false;
+
+    try {
+      const row = mapObligationToRow(ob);
+      const { error } = await _client.from('upcoming_obligations').upsert([row], { onConflict: 'id' });
+      if (error) {
+        console.warn('[Cashly] Notice inserting obligation in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice inserting obligation in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  async function deleteObligation(id) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      let query = _client.from('upcoming_obligations').delete().eq('id', id);
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      }
+      const { error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice deleting obligation in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice deleting obligation in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
   return {
     init,
     ensureConnected,
@@ -843,6 +1134,10 @@ const SupabaseService = (() => {
     fetchTransactions,
     insertTransaction,
     insertTransactions,
+    updateTransaction,
     deleteTransaction,
+    fetchObligations,
+    insertObligation,
+    deleteObligation,
   };
 })();

@@ -461,26 +461,60 @@ const AppState = (() => {
     if (!_store.currentUser) return;
 
     try {
-      const supaTxns = await SupabaseService.fetchTransactions();
+      const [supaTxns, supaObligations] = await Promise.all([
+        SupabaseService.fetchTransactions(),
+        SupabaseService.fetchObligations(),
+      ]);
+
       if (!_store.currentUser) return;
 
-      if (supaTxns && supaTxns.length > 0) {
-        _store.transactions = supaTxns;
-        refreshAllViews();
-        console.log(`[Cashly] Loaded ${supaTxns.length} transactions from Supabase.`);
-      } else if (supaTxns && supaTxns.length === 0) {
-        // First-time sync for this user: seed initial transactions to Supabase with user_id and business_id
-        console.log('[Cashly] Seeding initial transactions to Supabase for user & business...');
-        const user = _store.currentUser;
-        const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
-        if (user && user.id) {
-          _store.transactions.forEach(t => {
-            t.userId = user.id;
-            if (biz && biz.id) t.businessId = biz.id;
-          });
+      const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
+      const bizId = biz?.id || 'default';
+
+      if (Array.isArray(supaTxns)) {
+        if (supaTxns.length > 0) {
+          _store.transactions = supaTxns;
+        } else {
+          // If 0 transactions returned from Supabase:
+          // Check if this business was never seeded
+          const seedKey = 'cashly_seeded_' + bizId;
+          const alreadySeeded = localStorage.getItem(seedKey);
+          if (!alreadySeeded && _store.transactions.length > 0) {
+            const user = _store.currentUser;
+            if (user && user.id) {
+              _store.transactions.forEach(t => {
+                t.userId = user.id;
+                if (biz && biz.id) t.businessId = biz.id;
+              });
+            }
+            await SupabaseService.insertTransactions(_store.transactions);
+            try { localStorage.setItem(seedKey, '1'); } catch (e) {}
+          } else {
+            _store.transactions = [];
+          }
         }
-        await SupabaseService.insertTransactions(_store.transactions);
       }
+
+      if (Array.isArray(supaObligations)) {
+        if (supaObligations.length > 0) {
+          _store.payments = supaObligations;
+        } else {
+          const obSeedKey = 'cashly_ob_seeded_' + bizId;
+          const alreadySeededOb = localStorage.getItem(obSeedKey);
+          if (!alreadySeededOb && _store.payments.length > 0) {
+            for (const p of _store.payments) {
+              if (biz && biz.id) p.businessId = biz.id;
+              await SupabaseService.insertObligation(p);
+            }
+            try { localStorage.setItem(obSeedKey, '1'); } catch (e) {}
+          } else {
+            _store.payments = [];
+          }
+        }
+      }
+
+      refreshAllViews();
+      console.log(`[Cashly] Hydrated ${_store.transactions.length} transactions and ${_store.payments.length} obligations from Supabase.`);
     } catch (err) {
       console.warn('[Cashly] Notice synchronizing with Supabase:', err.message || err);
     }
@@ -619,7 +653,7 @@ const AppState = (() => {
       refreshAllViews();
 
       if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-        SupabaseService.insertTransaction(_store.transactions[idx]).catch(err => {
+        SupabaseService.updateTransaction(id, updatedData).catch(err => {
           console.warn('[Cashly] Notice updating transaction in Supabase:', err.message || err);
         });
       }
@@ -659,12 +693,14 @@ const AppState = (() => {
   }
 
   /**
-   * Add a new upcoming payment.
+   * Add a new upcoming payment / obligation.
    * @param {Object} payData
    */
   function addPayment(payData) {
+    const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
     const newPay = {
       id: 'pay-' + Date.now(),
+      businessId: biz ? biz.id : null,
       title: payData.title || 'Payment',
       amount: Number(payData.amount) || 0,
       dueDate: payData.dueDate || new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10),
@@ -673,10 +709,38 @@ const AppState = (() => {
       priority: payData.priority || PAYMENT_PRIORITIES.MEDIUM,
       status: PAYMENT_STATUSES.DUE,
       description: payData.description || '',
+      createdAt: new Date().toISOString(),
     };
     _store.payments.push(newPay);
     refreshAllViews();
+
+    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+      SupabaseService.insertObligation(newPay).catch(err => {
+        console.warn('[Cashly] Notice saving obligation to Supabase:', err.message || err);
+      });
+    }
+
     return newPay;
+  }
+
+  /**
+   * Delete an obligation by id
+   */
+  function deletePayment(id) {
+    const idx = _store.payments.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      _store.payments.splice(idx, 1);
+      refreshAllViews();
+
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        SupabaseService.deleteObligation(id).catch(err => {
+          console.warn('[Cashly] Notice deleting obligation from Supabase:', err.message || err);
+        });
+      }
+
+      return true;
+    }
+    return false;
   }
 
   /* ---- Derived summary metrics ---- */
@@ -930,6 +994,7 @@ const AppState = (() => {
     deleteTransaction,
     getPayments,
     addPayment,
+    deletePayment,
     getSummary,
     getBusiness,
     getForecast,
