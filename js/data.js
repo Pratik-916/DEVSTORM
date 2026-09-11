@@ -390,7 +390,7 @@ const AppState = (() => {
     syncStatus: DigitalFeedProvider.getStatus(),
   };
 
-  /* ---- Init: load base manual seed data ---- */
+  /* ---- Init: load base manual seed data or Supabase data ---- */
   function init() {
     _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({ ...t }));
     _store.payments     = SEED_PAYMENTS.map(p => ({ ...p }));
@@ -402,6 +402,34 @@ const AppState = (() => {
     });
 
     updateSyncUI(DigitalFeedProvider.getStatus());
+
+    // Connect to Supabase and load persisted transactions
+    if (typeof SupabaseService !== 'undefined') {
+      SupabaseService.init().then(connected => {
+        if (connected) {
+          loadFromSupabase();
+        }
+      });
+    }
+  }
+
+  async function loadFromSupabase() {
+    if (typeof SupabaseService === 'undefined' || !SupabaseService.isConnected()) return;
+
+    try {
+      const supaTxns = await SupabaseService.fetchTransactions();
+      if (supaTxns && supaTxns.length > 0) {
+        _store.transactions = supaTxns;
+        refreshAllViews();
+        console.log(`[Cashly] Loaded ${supaTxns.length} transactions from Supabase.`);
+      } else if (supaTxns && supaTxns.length === 0) {
+        // First-time sync: seed initial transactions to Supabase
+        console.log('[Cashly] Seeding initial transactions to Supabase...');
+        await SupabaseService.insertTransactions(_store.transactions);
+      }
+    } catch (err) {
+      console.error('[Cashly] Error synchronizing with Supabase:', err);
+    }
   }
 
   /* ---- Connect Demo Flow ---- */
@@ -413,6 +441,14 @@ const AppState = (() => {
           _store.transactions.unshift({ ...txn });
         }
       });
+
+      // Save imported demo transactions to Supabase if connected
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        SupabaseService.insertTransactions(batchToImport).catch(err => {
+          console.error('[Cashly] Failed to save demo batch to Supabase:', err);
+        });
+      }
+
       return batchToImport;
     }).then(result => {
       // Re-render UI components
@@ -487,6 +523,14 @@ const AppState = (() => {
 
     _store.transactions.unshift(newTxn);
     refreshAllViews();
+
+    // Save manual transaction to Supabase if connected
+    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+      SupabaseService.insertTransaction(newTxn).catch(err => {
+        console.error('[Cashly] Failed to save transaction to Supabase:', err);
+      });
+    }
+
     return newTxn;
   }
 
