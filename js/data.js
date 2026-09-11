@@ -12,11 +12,11 @@
  *  - 7-day cash forecast data
  *  - AppState: In-memory reactive store with helper methods
  *
- * ARCHITECTURE NOTE FOR FUTURE BACKEND / FINANCIAL API INTEGRATION:
- * The DigitalFeedProvider interface encapsulates all digital transaction ingestion.
- * When integrating real financial APIs (Account Aggregator, Open Banking,
- * UPI merchant webhooks, POS gateways), implement the provider interface without
- * altering AppState or the UI layer.
+ * PHASE 2B — CONNECT ACCOUNT DEMO:
+ * Simulated financial connection flow:
+ * Connect Account -> Select Demo Account -> Consent -> Allow Access -> Syncing -> Connected.
+ * Upon "Allow Access", 5 digital transactions (UPI, Card, Bank, Credit) are imported,
+ * and Auto Sync is set to ON.
  * ============================================================
  */
 
@@ -44,10 +44,10 @@ const PAYMENT_PRIORITIES     = { ESSENTIAL: 'essential', HIGH: 'high', MEDIUM: '
 const PAYMENT_STATUSES       = { DUE: 'due', PAID: 'paid', OVERDUE: 'overdue' };
 
 /* ----------------------------------------------------------
-   SEED: TRANSACTIONS
-   Represents both manual cash entries and auto-imported digital feeds.
+   SEED: BASE TRANSACTIONS (Before connecting digital accounts)
+   Manual cash register sales, daily petty expenses & drawings.
    ---------------------------------------------------------- */
-const SEED_TRANSACTIONS = [
+const SEED_BASE_TRANSACTIONS = [
   // --- Today (2024-11-26) ---
   {
     id: 'txn-001',
@@ -63,21 +63,6 @@ const SEED_TRANSACTIONS = [
     date: '2024-11-26',
     time: '10:30 AM',
     createdAt: new Date('2024-11-26T10:30:00').toISOString(),
-  },
-  {
-    id: 'txn-002',
-    source: TRANSACTION_SOURCES.AUTO,
-    type: TRANSACTION_TYPES.SALE,
-    amount: 2000,
-    paymentMethod: PAYMENT_METHODS.UPI,
-    channel: 'UPI • PhonePe QR',
-    reference: 'UPI/409281736192',
-    settlementStatus: SETTLEMENT_STATUSES.PENDING,
-    category: 'sales',
-    description: 'UPI Sale - Customer QR',
-    date: '2024-11-26',
-    time: '09:15 AM',
-    createdAt: new Date('2024-11-26T09:15:00').toISOString(),
   },
   {
     id: 'txn-003',
@@ -126,8 +111,30 @@ const SEED_TRANSACTIONS = [
     time: '05:30 PM',
     createdAt: new Date('2024-11-25T17:30:00').toISOString(),
   },
+];
+
+/* ----------------------------------------------------------
+   MOCK DIGITAL FEED BATCH (Imported automatically after "Allow Access")
+   5 simulated digital transactions representing UPI, Card, Bank & Credit.
+   ---------------------------------------------------------- */
+const MOCK_DIGITAL_BATCH = [
   {
-    id: 'txn-006',
+    id: 'txn-feed-001',
+    source: TRANSACTION_SOURCES.AUTO,
+    type: TRANSACTION_TYPES.SALE,
+    amount: 2000,
+    paymentMethod: PAYMENT_METHODS.UPI,
+    channel: 'UPI • PhonePe QR',
+    reference: 'UPI/409281736192',
+    settlementStatus: SETTLEMENT_STATUSES.PENDING,
+    category: 'sales',
+    description: 'UPI Sale - Customer QR',
+    date: '2024-11-26',
+    time: '09:15 AM',
+    createdAt: new Date('2024-11-26T09:15:00').toISOString(),
+  },
+  {
+    id: 'txn-feed-002',
     source: TRANSACTION_SOURCES.AUTO,
     type: TRANSACTION_TYPES.SALE,
     amount: 3800,
@@ -142,24 +149,22 @@ const SEED_TRANSACTIONS = [
     createdAt: new Date('2024-11-25T14:15:00').toISOString(),
   },
   {
-    id: 'txn-007',
+    id: 'txn-feed-003',
     source: TRANSACTION_SOURCES.AUTO,
-    type: TRANSACTION_TYPES.EXPENSE,
-    amount: 2000,
+    type: TRANSACTION_TYPES.SALE,
+    amount: 1950,
     paymentMethod: PAYMENT_METHODS.BANK,
-    channel: 'Bank • HDFC Direct',
-    reference: 'UTR/HDFC8830192',
+    channel: 'Bank • IMPS Inflow',
+    reference: 'IMPS/432019882',
     settlementStatus: SETTLEMENT_STATUSES.SETTLED,
-    category: 'supplier',
-    description: 'Supplier Payment - Direct Bank Transfer',
-    date: '2024-11-25',
-    time: '11:10 AM',
-    createdAt: new Date('2024-11-25T11:10:00').toISOString(),
+    category: 'sales',
+    description: 'Bank Transfer - Client Wholesale Order',
+    date: '2024-11-24',
+    time: '03:45 PM',
+    createdAt: new Date('2024-11-24T15:45:00').toISOString(),
   },
-
-  // --- 24 Nov 2024 ---
   {
-    id: 'txn-008',
+    id: 'txn-feed-004',
     source: TRANSACTION_SOURCES.AUTO,
     type: TRANSACTION_TYPES.SALE,
     amount: 2000,
@@ -174,36 +179,19 @@ const SEED_TRANSACTIONS = [
     createdAt: new Date('2024-11-24T16:10:00').toISOString(),
   },
   {
-    id: 'txn-009',
-    source: TRANSACTION_SOURCES.AUTO,
-    type: TRANSACTION_TYPES.SALE,
-    amount: 1950,
-    paymentMethod: PAYMENT_METHODS.BANK,
-    channel: 'Bank • IMPS Inflow',
-    reference: 'IMPS/432019882',
-    settlementStatus: SETTLEMENT_STATUSES.SETTLED,
-    category: 'sales',
-    description: 'Bank Transfer - Client Wholesale Order',
-    date: '2024-11-24',
-    time: '03:45 PM',
-    createdAt: new Date('2024-11-24T15:45:00').toISOString(),
-  },
-
-  // --- 23 Nov 2024 ---
-  {
-    id: 'txn-010',
+    id: 'txn-feed-005',
     source: TRANSACTION_SOURCES.AUTO,
     type: TRANSACTION_TYPES.EXPENSE,
-    amount: 1200,
+    amount: 2000,
     paymentMethod: PAYMENT_METHODS.BANK,
-    channel: 'Bank • Auto-Debit',
-    reference: 'ACH/EB-DELHI-09',
+    channel: 'Bank • HDFC Direct',
+    reference: 'UTR/HDFC8830192',
     settlementStatus: SETTLEMENT_STATUSES.SETTLED,
-    category: 'utilities',
-    description: 'Electricity Bill - Direct Bank Debit',
-    date: '2024-11-23',
-    time: '10:00 AM',
-    createdAt: new Date('2024-11-23T10:00:00').toISOString(),
+    category: 'supplier',
+    description: 'Supplier Payment - Direct Bank Transfer',
+    date: '2024-11-25',
+    time: '11:10 AM',
+    createdAt: new Date('2024-11-25T11:10:00').toISOString(),
   },
 ];
 
@@ -259,7 +247,6 @@ const SEED_PAYMENTS = [
 
 /* ----------------------------------------------------------
    FORECAST DATA (7 days from today)
-   Used by Dashboard.initChart()
    ---------------------------------------------------------- */
 const FORECAST_DATA = {
   labels: ['Today', 'Tomorrow', 'Day 3', 'Day 4 (Fri)', 'Day 5', 'Day 6', 'Day 7'],
@@ -271,7 +258,9 @@ const FORECAST_DATA = {
    Simulates automatic transaction feeds from UPI, Card, Bank, Credit.
    ---------------------------------------------------------- */
 const DigitalFeedProvider = (() => {
-  let _lastSynced = new Date();
+  let _isAccountConnected = false;
+  let _autoSync = false;
+  let _lastSynced = null;
   let _isSyncing = false;
   const _listeners = new Set();
 
@@ -284,16 +273,20 @@ const DigitalFeedProvider = (() => {
 
   function getStatus() {
     return {
-      status: 'active',
-      isConnected: true,
+      status: _isAccountConnected ? 'active' : 'disconnected',
+      isAccountConnected: _isAccountConnected,
+      autoSync: _autoSync,
       lastSynced: _lastSynced,
-      lastSyncedFormatted: formatSyncTime(_lastSynced),
+      lastSyncedFormatted: _isAccountConnected
+        ? (_lastSynced ? formatSyncTime(_lastSynced) : 'Just now')
+        : 'Connect Account',
       channels: connectedChannels,
       isSyncing: _isSyncing,
     };
   }
 
   function formatSyncTime(date) {
+    if (!date) return 'Just now';
     const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
     if (diffSec < 45) return 'Just now';
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
@@ -313,10 +306,52 @@ const DigitalFeedProvider = (() => {
   }
 
   /**
-   * Simulates an automatic sync with financial feeds.
-   * Can be triggered manually or via periodic timer.
+   * Simulates account connection and imports the digital batch.
+   */
+  function connectAccount(onImportedCallback) {
+    _isSyncing = true;
+    notify();
+
+    return new Promise(resolve => {
+      setTimeout(() => {
+        _isAccountConnected = true;
+        _autoSync = true;
+        _lastSynced = new Date();
+        _isSyncing = false;
+
+        let imported = [];
+        if (typeof onImportedCallback === 'function') {
+          imported = onImportedCallback(MOCK_DIGITAL_BATCH);
+        }
+
+        notify();
+        resolve({ status: getStatus(), imported });
+      }, 1000);
+    });
+  }
+
+  /**
+   * Resets connection demo (allows repeating the demo flow).
+   */
+  function disconnectAccount(onResetCallback) {
+    _isAccountConnected = false;
+    _autoSync = false;
+    _lastSynced = null;
+    _isSyncing = false;
+
+    if (typeof onResetCallback === 'function') {
+      onResetCallback();
+    }
+
+    notify();
+    return Promise.resolve(getStatus());
+  }
+
+  /**
+   * Simulates an automatic sync.
    */
   function syncNow() {
+    if (!_isAccountConnected) return Promise.resolve(getStatus());
     if (_isSyncing) return Promise.resolve(getStatus());
     _isSyncing = true;
     notify();
@@ -333,6 +368,8 @@ const DigitalFeedProvider = (() => {
 
   return {
     getStatus,
+    connectAccount,
+    disconnectAccount,
     syncNow,
     subscribe,
     formatSyncTime,
@@ -353,9 +390,9 @@ const AppState = (() => {
     syncStatus: DigitalFeedProvider.getStatus(),
   };
 
-  /* ---- Init: load seed data & connect feed ---- */
+  /* ---- Init: load base manual seed data ---- */
   function init() {
-    _store.transactions = SEED_TRANSACTIONS.map(t => ({ ...t }));
+    _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({ ...t }));
     _store.payments     = SEED_PAYMENTS.map(p => ({ ...p }));
 
     // Listen to feed status updates
@@ -363,6 +400,44 @@ const AppState = (() => {
       _store.syncStatus = status;
       updateSyncUI(status);
     });
+
+    updateSyncUI(DigitalFeedProvider.getStatus());
+  }
+
+  /* ---- Connect Demo Flow ---- */
+  function connectAccountDemo() {
+    return DigitalFeedProvider.connectAccount((batchToImport) => {
+      // Import the 5 digital transactions
+      batchToImport.forEach(txn => {
+        if (!_store.transactions.some(t => t.id === txn.id)) {
+          _store.transactions.unshift({ ...txn });
+        }
+      });
+      return batchToImport;
+    }).then(result => {
+      // Re-render UI components
+      refreshAllViews();
+      return result;
+    });
+  }
+
+  function disconnectAccountDemo() {
+    return DigitalFeedProvider.disconnectAccount(() => {
+      _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({ ...t }));
+      refreshAllViews();
+    });
+  }
+
+  function refreshAllViews() {
+    if (typeof Dashboard !== 'undefined' && typeof Dashboard.renderSummary === 'function') {
+      Dashboard.renderSummary();
+    }
+    if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') {
+      Transactions.render();
+    }
+    if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') {
+      Reports.renderMetrics();
+    }
   }
 
   /* ---- Transactions ---- */
@@ -516,6 +591,7 @@ const AppState = (() => {
       cashHealth,
       autoTransactionsCount,
       manualTransactionsCount,
+      isAccountConnected: DigitalFeedProvider.getStatus().isAccountConnected,
     };
   }
 
@@ -536,29 +612,43 @@ const AppState = (() => {
 
   function syncFeed() {
     return DigitalFeedProvider.syncNow().then(status => {
-      // Re-render UI components if active
-      if (typeof Dashboard !== 'undefined' && typeof Dashboard.renderSummary === 'function') {
-        Dashboard.renderSummary();
-      }
-      if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') {
-        Transactions.render();
-      }
-      if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') {
-        Reports.renderMetrics();
-      }
+      refreshAllViews();
       return status;
     });
   }
 
   function updateSyncUI(status) {
+    const isConnected = status.isAccountConnected;
+
+    // Desktop & Mobile texts
+    const textEls = document.querySelectorAll('.sync-text');
+    textEls.forEach(el => {
+      el.textContent = isConnected ? 'Auto Sync: ON' : 'Auto Sync: OFF';
+    });
+
     const timeEls = document.querySelectorAll('.sync-last-time');
     timeEls.forEach(el => {
-      el.textContent = status.isSyncing ? 'Syncing...' : (status.lastSyncedFormatted || 'Just now');
+      if (status.isSyncing) {
+        el.textContent = 'Syncing...';
+      } else if (isConnected) {
+        el.textContent = status.lastSyncedFormatted || 'Just now';
+      } else {
+        el.textContent = 'Connect Account';
+      }
     });
 
     const dotEls = document.querySelectorAll('.sync-dot');
     dotEls.forEach(dot => {
+      dot.classList.toggle('dot-off', !isConnected);
       dot.classList.toggle('syncing', status.isSyncing);
+    });
+
+    // Update indicators container title
+    const indicators = document.querySelectorAll('.sync-status-indicator');
+    indicators.forEach(ind => {
+      ind.title = isConnected
+        ? 'Connected: UPI, Card, Bank, Credit (Demo Sandbox). Click to sync now.'
+        : 'Click to connect financial account (Demo simulation).';
     });
   }
 
@@ -592,6 +682,8 @@ const AppState = (() => {
 
   return {
     init,
+    connectAccountDemo,
+    disconnectAccountDemo,
     getTransactions,
     getTransactionsBySource,
     addTransaction,

@@ -57,7 +57,51 @@ const Dashboard = (() => {
     // Update live values in advisor card if present
     const advisorMsg = document.querySelector('.advisor-message');
     if (advisorMsg) {
-      advisorMsg.textContent = `Your cash looks stable, but ${fmt(s.pendingSettlement)} of your digital sales are pending settlement. Digital feeds from UPI, Card, and Bank are auto-synced.`;
+      if (s.isAccountConnected) {
+        advisorMsg.textContent = `Your cash looks stable, with ${fmt(s.pendingSettlement)} in digital sales pending settlement. Auto Sync is active across UPI, Card, and Bank feeds.`;
+      } else {
+        advisorMsg.textContent = 'Connect your digital account to automatically track incoming UPI, Card, and Bank settlements without manual entry.';
+      }
+    }
+
+    // Update Connect Account Demo Banner
+    const banner = document.getElementById('dashboard-connect-banner');
+    const bannerTitle = document.getElementById('connect-banner-title');
+    const bannerDesc = document.getElementById('connect-banner-desc');
+    const bannerBtn = document.getElementById('btn-dashboard-connect');
+
+    if (banner) {
+      if (s.isAccountConnected) {
+        banner.classList.add('is-connected');
+        if (bannerTitle) {
+          bannerTitle.innerHTML = 'Account Connected: HDFC Bank &amp; UPI Feed <span class="badge badge-settled" style="font-size:10px;">Auto Sync: ON</span>';
+        }
+        if (bannerDesc) {
+          bannerDesc.textContent = 'Digital transactions from UPI, Card, and Bank feeds are automatically imported and synced in real time.';
+        }
+        if (bannerBtn) {
+          bannerBtn.textContent = 'Sync Now';
+          bannerBtn.className = 'btn btn-secondary btn-sm';
+          bannerBtn.onclick = () => {
+            if (typeof AppState !== 'undefined') AppState.syncFeed();
+          };
+        }
+      } else {
+        banner.classList.remove('is-connected');
+        if (bannerTitle) {
+          bannerTitle.innerHTML = 'Connect Financial Account <span class="connect-badge-demo">Demo Simulation</span>';
+        }
+        if (bannerDesc) {
+          bannerDesc.textContent = 'Connect your UPI, POS, or Bank feed to automatically import transactions without manual entry.';
+        }
+        if (bannerBtn) {
+          bannerBtn.textContent = 'Connect Account';
+          bannerBtn.className = 'btn btn-primary btn-sm';
+          bannerBtn.onclick = () => {
+            if (typeof ConnectAccount !== 'undefined') ConnectAccount.open();
+          };
+        }
+      }
     }
   }
 
