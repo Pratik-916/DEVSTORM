@@ -486,6 +486,7 @@ const AppState = (() => {
     };
 
     _store.transactions.unshift(newTxn);
+    refreshAllViews();
     return newTxn;
   }
 
@@ -515,66 +516,75 @@ const AppState = (() => {
       description: payData.description || '',
     };
     _store.payments.push(newPay);
+    refreshAllViews();
     return newPay;
   }
 
   /* ---- Derived summary metrics ---- */
 
   /**
-   * Compute comprehensive financial metrics.
-   * Total Sales = All sales (Settled Cash + Settled Digital + Pending Digital)
-   * Pending Settlement = Unsettled digital sales (UPI, Card, Credit)
-   * Settled Sales = Cash sales + Settled digital sales
-   * Total Expenses = All recorded expenses & personal withdrawals
-   * Available Cash = Settled inflows + base cash - Total expenses
-   * Safe to Spend = Available Cash - Upcoming Obligations - Safety Buffer (10%)
+   * Compute comprehensive financial metrics strictly from centralized transaction store:
+   * 1. Total Sales = All sales (Settled Cash + Settled Digital + Pending Digital)
+   * 2. Available Cash = Settled sales + Base float - Total Expenses (Pending digital sales NOT included)
+   * 3. Pending Settlement = Unsettled digital sales (UPI, Card, Credit)
+   * 4. Total Expenses = All expenses & personal withdrawals
+   * 5. Safe to Spend = Available Cash reduced by upcoming obligations
+   * 6. Cash Health = Simple evaluated status: 'healthy' | 'caution' | 'risk'
    */
   function getSummary() {
     const txns = _store.transactions;
 
-    // Total sales encompasses all sales activity
+    // Total sales encompasses all sales activity (settled + pending, manual + auto)
     const totalSales = txns
       .filter(t => t.type === TRANSACTION_TYPES.SALE)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Pending settlements: sales not yet settled in bank
+    // Pending settlements: digital sales not yet settled into bank
     const pendingSettlement = txns
       .filter(t => t.type === TRANSACTION_TYPES.SALE && t.settlementStatus === SETTLEMENT_STATUSES.PENDING)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Settled sales: cash collected + settled digital payments
+    // Settled sales: cash collected + settled digital inflows
     const settledSales = txns
       .filter(t => t.type === TRANSACTION_TYPES.SALE && t.settlementStatus === SETTLEMENT_STATUSES.SETTLED)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Total expenses (including cash expenses, withdrawals, and bank payouts)
+    // Total expenses: all recorded expenses and personal drawings/withdrawals
     const totalExpenses = txns
       .filter(t => t.type === TRANSACTION_TYPES.EXPENSE || t.type === TRANSACTION_TYPES.WITHDRAWAL)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Available cash = settled inflows + base float - expenses
+    // Available cash: settled sales + base float - total expenses (Pending digital sales strictly excluded)
     const baseFloat = _store.business.initialCashBalance || 800;
-    const availableCash = (settledSales + baseFloat) - totalExpenses;
+    const availableCash = Math.max(0, (settledSales + baseFloat) - totalExpenses);
 
-    // Upcoming obligations
+    // Upcoming obligations: due payments from payment schedule
     const upcomingObligations = _store.payments
       .filter(p => p.status === PAYMENT_STATUSES.DUE)
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // Safe to spend = available cash - upcoming obligations - safety buffer (10% of available)
-    const safetyBuffer = Math.round(availableCash * 0.10);
-    const safeToSpend = Math.max(0, availableCash - upcomingObligations - safetyBuffer);
+    // Near-term essential obligations (e.g. rent / immediate essential due)
+    const essentialObligations = _store.payments
+      .filter(p => p.status === PAYMENT_STATUSES.DUE && p.priority === PAYMENT_PRIORITIES.ESSENTIAL)
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // Safe to Spend: Available cash reduced by obligations
+    const obligationDeduction = essentialObligations > 0 ? essentialObligations : Math.round(upcomingObligations * 0.6);
+    const safeToSpend = Math.max(0, availableCash - obligationDeduction);
 
     // Breakdown metrics by source
     const autoTransactionsCount = txns.filter(t => t.source === TRANSACTION_SOURCES.AUTO).length;
     const manualTransactionsCount = txns.filter(t => t.source === TRANSACTION_SOURCES.MANUAL).length;
 
-    // Cash health state
+    // Cash Health: Healthy / Caution / At Risk
+    // Healthy: Available cash covers upcoming obligations comfortably (or safeToSpend >= 3000)
+    // Caution: Available cash covers at least 50% of upcoming obligations
+    // At Risk: Available cash covers less than 50% of upcoming obligations or <= 0
     let cashHealth;
-    const obligationRatio = upcomingObligations / (availableCash || 1);
-    if (obligationRatio < 0.5) {
+    const coverageRatio = upcomingObligations > 0 ? (availableCash / upcomingObligations) : 1;
+    if (coverageRatio >= 0.85 || safeToSpend >= 3000) {
       cashHealth = 'healthy';
-    } else if (obligationRatio < 0.9) {
+    } else if (coverageRatio >= 0.45) {
       cashHealth = 'caution';
     } else {
       cashHealth = 'risk';
@@ -600,9 +610,74 @@ const AppState = (() => {
     return { ..._store.business };
   }
 
-  /* ---- Forecast ---- */
+  /* ---- Dynamic 7-Day Forecast ---- */
   function getForecast() {
-    return { ...FORECAST_DATA };
+    const summary = getSummary();
+    const availableCash = summary.availableCash;
+    const pendingSettlement = summary.pendingSettlement;
+    const payments = getPayments().filter(p => p.status === PAYMENT_STATUSES.DUE);
+
+    const labels = ['Today', 'Tomorrow', 'Day 3', 'Day 4 (Fri)', 'Day 5', 'Day 6', 'Day 7'];
+
+    // Map obligations to 7-day projection buckets
+    const dailyObligations = [0, 0, 0, 0, 0, 0, 0];
+    payments.forEach(p => {
+      let dayIdx = -1;
+      const lbl = (p.dueDateLabel || '').toLowerCase();
+      if (lbl.includes('tomorrow')) dayIdx = 1;
+      else if (lbl.includes('3 days')) dayIdx = 2;
+      else if (lbl.includes('4 days') || lbl.includes('fri')) dayIdx = 3;
+      else if (lbl.includes('5 days')) dayIdx = 4;
+      else if (lbl.includes('6 days')) dayIdx = 5;
+      else if (lbl.includes('7 days')) dayIdx = 6;
+      else {
+        dayIdx = 3; // default mid-week
+      }
+
+      if (dayIdx >= 0 && dayIdx < 7) {
+        dailyObligations[dayIdx] += p.amount;
+      }
+    });
+
+    // Scheduled settlement inflows (settles over T+1 and T+2):
+    // Tomorrow: 60% of pending settlement
+    // Day 3: 40% of pending settlement
+    const dailySettlements = [
+      0,
+      Math.round(pendingSettlement * 0.6),
+      Math.round(pendingSettlement * 0.4),
+      0, 0, 0, 0
+    ];
+
+    // Estimated daily organic counter cash inflow from business activity
+    const avgDailyCashSales = Math.round((summary.settledSales || 4000) / 4) || 1500;
+
+    // Project running available cash curve
+    const values = [];
+    let runningCash = availableCash;
+
+    for (let day = 0; day < 7; day++) {
+      if (day === 0) {
+        values.push(runningCash);
+      } else {
+        runningCash = runningCash + dailySettlements[day] + avgDailyCashSales - dailyObligations[day];
+        values.push(Math.max(500, runningCash));
+      }
+    }
+
+    // Determine lowest point in 7 days
+    const lowestVal = Math.min(...values);
+    const lowestIdx = values.indexOf(lowestVal);
+    const lowestLabel = labels[lowestIdx];
+
+    return {
+      labels,
+      values,
+      lowestPoint: {
+        value: lowestVal,
+        label: lowestLabel,
+      },
+    };
   }
 
   /* ---- Feed & Sync ---- */
@@ -697,6 +772,7 @@ const AppState = (() => {
     formatCurrency,
     getTransactionsByDate,
     getDateGroupLabel,
+    refreshAllViews,
     // Expose constants for other modules
     TRANSACTION_SOURCES,
     TRANSACTION_TYPES,

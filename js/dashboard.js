@@ -38,8 +38,16 @@ const Dashboard = (() => {
     if (badge) {
       const labels  = { healthy: 'Healthy', caution: 'Caution', risk: 'At Risk' };
       const classes = { healthy: 'badge-healthy', caution: 'badge-caution', risk: 'badge-risk' };
-      badge.textContent = labels[s.cashHealth] || 'Caution';
+      const label = labels[s.cashHealth] || 'Caution';
+      let iconSvg = '';
+      if (s.cashHealth === 'healthy') {
+        iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+      } else {
+        iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+      }
+      badge.innerHTML = `${iconSvg} ${label}`;
       badge.className   = 'badge ' + (classes[s.cashHealth] || 'badge-caution');
+      badge.setAttribute('aria-label', `Cash health: ${label}`);
     }
 
     // Cash position message tone
@@ -52,6 +60,18 @@ const Dashboard = (() => {
       } else {
         msg.textContent = 'Your upcoming payments are getting close to your available cash.';
       }
+    }
+
+    // Update safe-to-spend container aria-label
+    const safeContainer = document.querySelector('.safe-to-spend');
+    if (safeContainer) {
+      safeContainer.setAttribute('aria-label', `Safe to spend: ${fmt(s.safeToSpend)}`);
+    }
+
+    // Update payments page total if on page
+    const payTotal = document.querySelector('.payments-summary-amount');
+    if (payTotal) {
+      payTotal.textContent = fmt(s.upcomingObligations);
     }
 
     // Update live values in advisor card if present
@@ -103,6 +123,51 @@ const Dashboard = (() => {
         }
       }
     }
+
+    // Update dynamic forecast chart & note
+    updateChart();
+  }
+
+  /**
+   * Update forecast chart and note with live data from AppState
+   */
+  function updateChart() {
+    const canvas = document.getElementById('forecast-chart');
+    if (!canvas) return;
+
+    if (!chartInstance) {
+      initChart();
+      return;
+    }
+
+    if (typeof AppState === 'undefined') return;
+    const forecast = AppState.getForecast();
+
+    if (chartInstance && chartInstance.data && chartInstance.data.datasets[0]) {
+      chartInstance.data.labels = forecast.labels;
+      chartInstance.data.datasets[0].data = forecast.values;
+      chartInstance.update();
+    }
+
+    updateForecastNote(forecast);
+  }
+
+  function updateForecastNote(forecast) {
+    const noteEl = document.querySelector('.forecast-note');
+    if (noteEl && forecast && forecast.lowestPoint) {
+      const fmt = (typeof AppState !== 'undefined')
+        ? AppState.formatCurrency
+        : (v) => '\u20b9' + v.toLocaleString('en-IN');
+      noteEl.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" x2="12" y1="8" y2="12" />
+          <line x1="12" x2="12.01" y1="16" y2="16" />
+        </svg>
+        Lowest expected cash: <strong>${fmt(forecast.lowestPoint.value)} on ${forecast.lowestPoint.label}</strong>
+      `;
+    }
   }
 
   /**
@@ -125,6 +190,7 @@ const Dashboard = (() => {
       : {
           labels: ['Today', 'Tomorrow', 'Day 3', 'Day 4 (Fri)', 'Day 5', 'Day 6', 'Day 7'],
           values: [8250, 5000, 7500, 4200, 6000, 8000, 10000],
+          lowestPoint: { value: 4200, label: 'Friday' },
         };
 
     const ctx = canvas.getContext('2d');
@@ -201,8 +267,7 @@ const Dashboard = (() => {
       },
     });
 
-    // Also render the summary metrics now that the page is active
-    renderSummary();
+    updateForecastNote(forecast);
   }
 
   function initSyncTriggers() {
@@ -221,7 +286,7 @@ const Dashboard = (() => {
     renderSummary();
   }
 
-  return { init, initChart, renderSummary };
+  return { init, initChart, updateChart, renderSummary };
 })();
 
 document.addEventListener('DOMContentLoaded', Dashboard.init);

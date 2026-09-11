@@ -317,25 +317,21 @@ const AddTransaction = (() => {
       // Save upcoming payment
       const data = collectPaymentData();
       AppState.addPayment(data);
+      if (typeof AppState.refreshAllViews === 'function') {
+        AppState.refreshAllViews();
+      }
       showSuccess('Upcoming obligation added');
     } else {
       // Save transaction (cash sale, cash expense, withdrawal)
       const data = collectFormData();
       AppState.addTransaction(data);
 
-      // Refresh the transactions page list if active
-      if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') {
-        Transactions.render();
-      }
-
-      // Refresh dashboard metrics
-      if (typeof Dashboard !== 'undefined' && typeof Dashboard.renderSummary === 'function') {
-        Dashboard.renderSummary();
-      }
-
-      // Refresh reports metrics
-      if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') {
-        Reports.renderMetrics();
+      if (typeof AppState.refreshAllViews === 'function') {
+        AppState.refreshAllViews();
+      } else {
+        if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') Transactions.render();
+        if (typeof Dashboard !== 'undefined' && typeof Dashboard.renderSummary === 'function') Dashboard.renderSummary();
+        if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') Reports.renderMetrics();
       }
 
       showSuccess(currentType === 'withdrawal' ? 'Personal withdrawal recorded' : 'Transaction recorded');
