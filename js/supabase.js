@@ -1,15 +1,17 @@
 /**
  * supabase.js
  * ============================================================
- * Supabase client and persistence provider for Cashly.
+ * Supabase client, authentication, and persistence provider for Cashly.
  *
  * Handles:
  * - Supabase Authentication (Email / Password signup, login, logout, session)
- * - Persisted Transactions with User ID isolation & RLS support
+ * - User -> Business relationship management
+ * - Persisted Transactions scoped to Business ID with RLS support
  * - Resilient hybrid client: uses official @supabase/supabase-js if loaded,
  *   or native Fetch REST client if CDN is blocked/offline.
  *
  * Reads SUPABASE_URL and SUPABASE_ANON_KEY from environment variables.
+ * Never exposes service-role or secret keys.
  * ============================================================
  */
 
@@ -19,6 +21,7 @@ const SupabaseService = (() => {
   let _client = null;
   let _isConfigured = false;
   let _currentUser = null;
+  let _currentBusiness = null;
 
   /**
    * Load environment configuration from window.__ENV__ or fetch /.env
@@ -59,6 +62,22 @@ const SupabaseService = (() => {
       return window.__ENV__;
     }
     return fallback;
+  }
+
+  /**
+   * RFC4122 compliant UUID v4 generator for PostgreSQL UUID columns
+   */
+  function generateUUID() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      try {
+        return crypto.randomUUID();
+      } catch (e) {}
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 
   /**
@@ -153,67 +172,107 @@ const SupabaseService = (() => {
         },
       },
       from(table) {
+        const filters = [];
+        const orderClauses = [];
+
+        const executeQuery = async () => {
+          try {
+            let queryUrl = `${url}/rest/v1/${table}?select=*`;
+            filters.forEach(([col, val]) => {
+              queryUrl += `&${col}=eq.${encodeURIComponent(val)}`;
+            });
+            if (orderClauses.length > 0) {
+              queryUrl += '&' + orderClauses.join('&');
+            }
+            const res = await fetch(queryUrl, { headers: authHeaders() });
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              return { data: null, error: errData };
+            }
+            const data = await res.json();
+            return { data, error: null };
+          } catch (e) {
+            return { data: null, error: e };
+          }
+        };
+
+        const builder = {
+          eq(col, val) {
+            filters.push([col, val]);
+            return builder;
+          },
+          order(field, { ascending = true } = {}) {
+            orderClauses.push(`order=${field}.${ascending ? 'asc' : 'desc'}`);
+            return builder;
+          },
+          single() {
+            return (async () => {
+              const { data, error } = await executeQuery();
+              if (error) return { data: null, error };
+              return { data: (data && data.length > 0) ? data[0] : null, error: null };
+            })();
+          },
+          then(resolve, reject) {
+            return executeQuery().then(resolve, reject);
+          },
+        };
+
         return {
           select(cols = '*') {
-            let filterUserId = null;
-            return {
-              order(field, { ascending = true } = {}) {
-                return {
-                  order(field2, { ascending: asc2 = true } = {}) {
-                    return (async () => {
-                      try {
-                        let queryUrl = `${url}/rest/v1/${table}?select=${cols}&order=${field}.${ascending ? 'asc' : 'desc'}&order=${field2}.${asc2 ? 'asc' : 'desc'}`;
-                        if (filterUserId) queryUrl += `&user_id=eq.${filterUserId}`;
-                        const res = await fetch(queryUrl, { headers: authHeaders() });
-                        if (!res.ok) return { data: null, error: await res.json() };
-                        return { data: await res.json(), error: null };
-                      } catch (e) {
-                        return { data: null, error: e };
-                      }
-                    })();
-                  },
-                  eq(col, val) {
-                    if (col === 'user_id') filterUserId = val;
-                    return this;
-                  }
-                };
-              },
-              eq(col, val) {
-                if (col === 'user_id') filterUserId = val;
-                return this;
-              }
-            };
+            return builder;
           },
-          async upsert(rows, { onConflict } = {}) {
+          async insert(rows) {
+            const dataArray = Array.isArray(rows) ? rows : [rows];
             try {
               const res = await fetch(`${url}/rest/v1/${table}`, {
                 method: 'POST',
                 headers: {
                   ...authHeaders(),
-                  'Prefer': 'resolution=merge-duplicates',
+                  'Prefer': 'return=representation',
                 },
-                body: JSON.stringify(rows),
+                body: JSON.stringify(dataArray),
               });
-              if (!res.ok) return { data: null, error: await res.json() };
-              return { data: null, error: null };
+              if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                return { data: null, error: errData };
+              }
+              const data = await res.json();
+              return { data, error: null };
+            } catch (e) {
+              return { data: null, error: e };
+            }
+          },
+          async upsert(rows, { onConflict } = {}) {
+            const dataArray = Array.isArray(rows) ? rows : [rows];
+            try {
+              const res = await fetch(`${url}/rest/v1/${table}`, {
+                method: 'POST',
+                headers: {
+                  ...authHeaders(),
+                  'Prefer': 'resolution=merge-duplicates,return=representation',
+                },
+                body: JSON.stringify(dataArray),
+              });
+              if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                return { data: null, error: errData };
+              }
+              const data = await res.json().catch(() => null);
+              return { data, error: null };
             } catch (e) {
               return { data: null, error: e };
             }
           },
           delete() {
-            let deleteId = null;
-            let deleteUserId = null;
             return {
               eq(col, val) {
-                if (col === 'id') deleteId = val;
-                if (col === 'user_id') deleteUserId = val;
+                filters.push([col, val]);
                 return {
                   eq(col2, val2) {
-                    if (col2 === 'id') deleteId = val2;
-                    if (col2 === 'user_id') deleteUserId = val2;
+                    filters.push([col2, val2]);
                     return (async () => {
-                      let queryUrl = `${url}/rest/v1/${table}?id=eq.${deleteId}`;
-                      if (deleteUserId) queryUrl += `&user_id=eq.${deleteUserId}`;
+                      let queryUrl = `${url}/rest/v1/${table}?`;
+                      queryUrl += filters.map(([c, v]) => `${c}=eq.${encodeURIComponent(v)}`).join('&');
                       try {
                         const res = await fetch(queryUrl, { method: 'DELETE', headers: authHeaders() });
                         return { error: res.ok ? null : await res.json() };
@@ -222,12 +281,12 @@ const SupabaseService = (() => {
                       }
                     })();
                   },
-                  then(resolve) {
-                    let queryUrl = `${url}/rest/v1/${table}?id=eq.${deleteId}`;
-                    if (deleteUserId) queryUrl += `&user_id=eq.${deleteUserId}`;
+                  then(resolve, reject) {
+                    let queryUrl = `${url}/rest/v1/${table}?`;
+                    queryUrl += filters.map(([c, v]) => `${c}=eq.${encodeURIComponent(v)}`).join('&');
                     return fetch(queryUrl, { method: 'DELETE', headers: authHeaders() })
                       .then(res => ({ error: res.ok ? null : true }))
-                      .then(resolve);
+                      .then(resolve, reject);
                   }
                 };
               }
@@ -282,6 +341,14 @@ const SupabaseService = (() => {
         try {
           const cached = localStorage.getItem('cashly_auth_user');
           if (cached) _currentUser = JSON.parse(cached);
+        } catch (e) {}
+      }
+
+      // Check cached active business
+      if (!_currentBusiness && _currentUser) {
+        try {
+          const cachedBiz = localStorage.getItem('cashly_user_business_' + _currentUser.id);
+          if (cachedBiz) _currentBusiness = JSON.parse(cachedBiz);
         } catch (e) {}
       }
     }
@@ -358,7 +425,7 @@ const SupabaseService = (() => {
         if (errMsg.includes('rate limit') || errMsg.includes('rate_limit') || error.code === 429 || error.status === 429) {
           console.warn('[Cashly] Supabase email rate limit reached. Proceeding in verified user mode.');
           const fallbackUser = {
-            id: 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+            id: generateUUID(),
             email: email.toLowerCase().trim(),
             role: 'authenticated',
             created_at: new Date().toISOString(),
@@ -368,6 +435,8 @@ const SupabaseService = (() => {
             localStorage.setItem('cashly_auth_user', JSON.stringify(fallbackUser));
           } catch (e) {}
           _currentUser = fallbackUser;
+          // Create business profile for this new user
+          await getOrCreateBusiness(fallbackUser);
           return { user: fallbackUser, session: { user: fallbackUser }, error: null };
         }
         return { user: null, session: null, error };
@@ -380,6 +449,8 @@ const SupabaseService = (() => {
         try {
           localStorage.setItem('cashly_pending_user_' + email.toLowerCase().trim(), JSON.stringify(user));
         } catch (e) {}
+        // Create business profile for this new user
+        await getOrCreateBusiness(user);
       }
 
       if (session) {
@@ -417,6 +488,7 @@ const SupabaseService = (() => {
           try {
             localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
           } catch (e) {}
+          await getOrCreateBusiness(_currentUser);
           return { user: _currentUser, session: { user: _currentUser }, error: null };
         }
         return { user: null, session: null, error };
@@ -430,6 +502,7 @@ const SupabaseService = (() => {
         try {
           localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
         } catch (e) {}
+        await getOrCreateBusiness(user);
       }
 
       return { user, session, error: null };
@@ -449,9 +522,11 @@ const SupabaseService = (() => {
       } catch (e) {}
     }
     _currentUser = null;
+    _currentBusiness = null;
     try {
       localStorage.removeItem('cashly_auth_user');
       localStorage.removeItem('cashly_auth_session');
+      localStorage.removeItem('cashly_active_business');
     } catch (e) {}
     return true;
   }
@@ -469,7 +544,100 @@ const SupabaseService = (() => {
   }
 
   /* ============================================================
-     TRANSACTION PERSISTENCE METHODS
+     USER -> BUSINESS RELATIONSHIP METHODS
+     ============================================================ */
+
+  function getCurrentBusiness() {
+    if (_currentBusiness) return _currentBusiness;
+    try {
+      const cached = localStorage.getItem('cashly_active_business');
+      if (cached) _currentBusiness = JSON.parse(cached);
+    } catch (e) {}
+    return _currentBusiness;
+  }
+
+  function setBusiness(biz) {
+    _currentBusiness = biz;
+    try {
+      if (biz) {
+        localStorage.setItem('cashly_active_business', JSON.stringify(biz));
+        if (biz.owner_id) {
+          localStorage.setItem('cashly_user_business_' + biz.owner_id, JSON.stringify(biz));
+        }
+      } else {
+        localStorage.removeItem('cashly_active_business');
+      }
+    } catch (e) {}
+  }
+
+  /**
+   * Fetch existing business or create new business profile for authenticated user
+   */
+  async function getOrCreateBusiness(user) {
+    if (!user || !user.id) return null;
+
+    // 1. Check in-memory cache
+    if (_currentBusiness && _currentBusiness.owner_id === user.id) {
+      return _currentBusiness;
+    }
+
+    // 2. Check local storage cache
+    try {
+      const cached = localStorage.getItem('cashly_user_business_' + user.id);
+      if (cached) {
+        _currentBusiness = JSON.parse(cached);
+        setBusiness(_currentBusiness);
+        return _currentBusiness;
+      }
+    } catch (e) {}
+
+    await ensureConnected();
+
+    // 3. Try to fetch from Supabase
+    if (isConnected()) {
+      try {
+        const { data, error } = await _client
+          .from('businesses')
+          .select('*')
+          .eq('owner_id', user.id);
+
+        if (!error && data && data.length > 0) {
+          _currentBusiness = data[0];
+          setBusiness(_currentBusiness);
+          return _currentBusiness;
+        }
+      } catch (err) {
+        console.warn('[Cashly] Notice fetching user business:', err.message || err);
+      }
+    }
+
+    // 4. Create new Business profile for this user
+    const defaultName = user.email ? (user.email.split('@')[0].toUpperCase() + ' Store') : 'Demo Shop';
+    let newBusiness = {
+      id: generateUUID(),
+      owner_id: user.id,
+      name: defaultName,
+      created_at: new Date().toISOString(),
+    };
+
+    if (isConnected()) {
+      try {
+        const res = await _client.from('businesses').insert([newBusiness]);
+        if (res && res.data && res.data[0]) {
+          newBusiness = res.data[0];
+        }
+      } catch (err) {
+        console.warn('[Cashly] Notice creating business profile in Supabase:', err.message || err);
+      }
+    }
+
+    _currentBusiness = newBusiness;
+    setBusiness(newBusiness);
+    return newBusiness;
+  }
+
+  /* ============================================================
+     TRANSACTION PERSISTENCE METHODS (BUSINESS SCOPED)
      ============================================================ */
 
   /**
@@ -485,6 +653,7 @@ const SupabaseService = (() => {
 
     return {
       id: row.id,
+      businessId: row.business_id || null,
       userId: row.user_id || null,
       type: row.type,
       amount: Number(row.amount) || 0,
@@ -506,8 +675,10 @@ const SupabaseService = (() => {
    */
   function mapTxnToRow(txn) {
     const userId = txn.userId || (_currentUser ? _currentUser.id : null);
+    const businessId = txn.businessId || (_currentBusiness ? _currentBusiness.id : null);
     return {
       id: txn.id,
+      business_id: businessId,
       user_id: userId,
       type: txn.type,
       amount: Number(txn.amount) || 0,
@@ -524,7 +695,7 @@ const SupabaseService = (() => {
   }
 
   /**
-   * Fetch all transactions from Supabase (separated by logged in user)
+   * Fetch all transactions from Supabase (separated by business / logged in user)
    */
   async function fetchTransactions() {
     await ensureConnected();
@@ -533,12 +704,18 @@ const SupabaseService = (() => {
     try {
       let query = _client
         .from('transactions')
-        .select('*')
-        .order('transaction_date', { ascending: false })
-        .order('created_at', { ascending: false });
+        .select('*');
 
-      if (_currentUser && _currentUser.id) {
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      } else if (_currentUser && _currentUser.id) {
         query = query.eq('user_id', _currentUser.id);
+      }
+
+      if (query && typeof query.order === 'function') {
+        query = query
+          .order('transaction_date', { ascending: false })
+          .order('created_at', { ascending: false });
       }
 
       const { data, error } = await query;
@@ -630,7 +807,9 @@ const SupabaseService = (() => {
         .delete()
         .eq('id', id);
 
-      if (_currentUser && _currentUser.id) {
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      } else if (_currentUser && _currentUser.id) {
         query = query.eq('user_id', _currentUser.id);
       }
 
@@ -658,6 +837,9 @@ const SupabaseService = (() => {
     signIn,
     signOut,
     setUser,
+    getCurrentBusiness,
+    setBusiness,
+    getOrCreateBusiness,
     fetchTransactions,
     insertTransaction,
     insertTransactions,

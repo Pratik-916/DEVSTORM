@@ -15,6 +15,12 @@ const Router = (() => {
    * @param {string} page - page name, e.g. 'dashboard'
    */
   function navigateTo(page) {
+    // Protect app pages from logged-out users
+    if (typeof Auth !== 'undefined' && typeof Auth.isAuthenticated === 'function' && !Auth.isAuthenticated()) {
+      Auth.showAuth('login');
+      return;
+    }
+
     // 1. Hide all pages
     document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
 
@@ -69,7 +75,9 @@ const Router = (() => {
     // 7. Scroll to top on page change
     const content = document.querySelector('.page-content');
     if (content) content.scrollTop = 0;
-    window.scrollTo(0, 0);
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo(0, 0);
+    }
   }
 
   /**

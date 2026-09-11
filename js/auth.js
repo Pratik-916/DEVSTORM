@@ -76,10 +76,17 @@ const Auth = (() => {
     }
   }
 
+  let _isAuthenticated = false;
+
+  function isAuthenticated() {
+    return _isAuthenticated;
+  }
+
   /**
    * Display authenticated application shell
    */
-  function showApp(user) {
+  async function showApp(user) {
+    _isAuthenticated = true;
     const authScreen = document.getElementById('auth-screen');
     const appShell = document.querySelector('.app-shell');
 
@@ -89,6 +96,24 @@ const Auth = (() => {
     if (user) {
       if (typeof AppState !== 'undefined') {
         AppState.setCurrentUser(user);
+
+        // Fetch or create user's business profile
+        if (typeof SupabaseService !== 'undefined') {
+          const biz = await SupabaseService.getOrCreateBusiness(user);
+          if (biz) {
+            AppState.setCurrentBusiness(biz);
+
+            // Update UI business names
+            document.querySelectorAll('.business-name').forEach(el => {
+              el.textContent = biz.name;
+            });
+            const settingsBizName = document.querySelector('.settings-row-value');
+            if (settingsBizName) {
+              settingsBizName.textContent = biz.name;
+            }
+          }
+        }
+
         AppState.init();
       }
 
@@ -114,6 +139,7 @@ const Auth = (() => {
    * Display authentication screen (logged out state)
    */
   function showAuth(mode = 'login') {
+    _isAuthenticated = false;
     const authScreen = document.getElementById('auth-screen');
     const appShell = document.querySelector('.app-shell');
 
@@ -277,6 +303,7 @@ const Auth = (() => {
     showApp,
     logout,
     setMode,
+    isAuthenticated,
   };
 })();
 

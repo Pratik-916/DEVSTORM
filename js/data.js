@@ -402,17 +402,39 @@ const AppState = (() => {
     return _store.currentUser;
   }
 
+  function setCurrentBusiness(biz) {
+    if (biz) {
+      _store.business = {
+        ..._store.business,
+        id: biz.id,
+        businessName: biz.name || _store.business.businessName,
+        ownerId: biz.owner_id,
+      };
+      if (typeof SupabaseService !== 'undefined') {
+        SupabaseService.setBusiness(biz);
+      }
+    }
+  }
+
+  function getCurrentBusiness() {
+    return _store.business;
+  }
+
   function reset() {
     _store.transactions = [];
     _store.currentUser = null;
+    _store.business = { ...BUSINESS };
     refreshAllViews();
   }
 
   /* ---- Init: load base manual seed data or Supabase data ---- */
   function init() {
+    const user = _store.currentUser;
+    const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
     _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({
       ...t,
-      userId: _store.currentUser ? _store.currentUser.id : null,
+      userId: user ? user.id : null,
+      businessId: biz ? biz.id : null,
     }));
     _store.payments     = SEED_PAYMENTS.map(p => ({ ...p }));
 
@@ -447,11 +469,15 @@ const AppState = (() => {
         refreshAllViews();
         console.log(`[Cashly] Loaded ${supaTxns.length} transactions from Supabase.`);
       } else if (supaTxns && supaTxns.length === 0) {
-        // First-time sync for this user: seed initial transactions to Supabase with user_id
-        console.log('[Cashly] Seeding initial transactions to Supabase for user...');
+        // First-time sync for this user: seed initial transactions to Supabase with user_id and business_id
+        console.log('[Cashly] Seeding initial transactions to Supabase for user & business...');
         const user = _store.currentUser;
+        const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
         if (user && user.id) {
-          _store.transactions.forEach(t => { t.userId = user.id; });
+          _store.transactions.forEach(t => {
+            t.userId = user.id;
+            if (biz && biz.id) t.businessId = biz.id;
+          });
         }
         await SupabaseService.insertTransactions(_store.transactions);
       }
@@ -465,11 +491,13 @@ const AppState = (() => {
     return DigitalFeedProvider.connectAccount((batchToImport) => {
       // Import the 5 digital transactions
       const user = _store.currentUser;
+      const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
       batchToImport.forEach(txn => {
         if (!_store.transactions.some(t => t.id === txn.id)) {
           _store.transactions.unshift({
             ...txn,
             userId: user ? user.id : null,
+            businessId: biz ? biz.id : null,
           });
         }
       });
@@ -543,8 +571,10 @@ const AppState = (() => {
     if (paymentMethod === PAYMENT_METHODS.BANK)   defaultChannel = 'Bank Transfer';
     if (paymentMethod === PAYMENT_METHODS.CREDIT) defaultChannel = 'Credit • Ledger';
 
+    const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
     const newTxn = {
       id: 'txn-' + Date.now(),
+      businessId: txnData.businessId || (biz ? biz.id : null),
       userId: txnData.userId || (_store.currentUser ? _store.currentUser.id : null),
       source: source,
       type: txnData.type || TRANSACTION_TYPES.SALE,
@@ -888,6 +918,8 @@ const AppState = (() => {
     init,
     setCurrentUser,
     getCurrentUser,
+    setCurrentBusiness,
+    getCurrentBusiness,
     reset,
     connectAccountDemo,
     disconnectAccountDemo,
