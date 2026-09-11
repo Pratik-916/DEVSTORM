@@ -436,9 +436,12 @@ const AppState = (() => {
 
   async function loadFromSupabase() {
     if (typeof SupabaseService === 'undefined' || !SupabaseService.isConnected()) return;
+    if (!_store.currentUser) return;
 
     try {
       const supaTxns = await SupabaseService.fetchTransactions();
+      if (!_store.currentUser) return;
+
       if (supaTxns && supaTxns.length > 0) {
         _store.transactions = supaTxns;
         refreshAllViews();
