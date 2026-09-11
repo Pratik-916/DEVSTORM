@@ -1,11 +1,11 @@
 /**
  * addtransaction.js
- * Controls the Add Transaction modal:
+ * Controls the Add Manual Transaction & Obligation modal:
  *   - Open/close the modal overlay
- *   - Type selector (Sale / Expense / Upcoming Payment)
+ *   - Type selector (Cash Sale / Cash Expense / Personal Withdrawal / Upcoming Obligation)
  *   - Switch between type-selector view and form view
  *   - Form field interactions (payment method, settlement toggle, type toggle)
- *   - On submit: saves to AppState and refreshes relevant UI
+ *   - On submit: saves manual entry to AppState and refreshes UI across all pages
  */
 
 'use strict';
@@ -18,48 +18,78 @@ const AddTransaction = (() => {
   let selectedMethod = 'cash';
 
   function open() {
+    if (!overlay) return;
     overlay.classList.add('open');
     showTypeScreen();
     document.body.style.overflow = 'hidden';
   }
 
   function close() {
+    if (!overlay) return;
     overlay.classList.remove('open');
     document.body.style.overflow = '';
     resetForm();
   }
 
   function showTypeScreen() {
-    typeScreen.classList.remove('hidden');
-    formScreen.classList.add('hidden');
+    typeScreen?.classList.remove('hidden');
+    formScreen?.classList.add('hidden');
   }
 
   function showFormScreen(type) {
-    typeScreen.classList.add('hidden');
-    formScreen.classList.remove('hidden');
+    typeScreen?.classList.add('hidden');
+    formScreen?.classList.remove('hidden');
 
-    // Set the form type toggle
-    if (type === 'sale' || type === 'expense') {
-      const saleBtn    = document.getElementById('type-toggle-sale');
-      const expenseBtn = document.getElementById('type-toggle-expense');
-      if (saleBtn && expenseBtn) {
-        saleBtn.classList.toggle('selected', type === 'sale');
-        expenseBtn.classList.toggle('selected', type === 'expense');
+    const typeToggleGroup  = document.getElementById('form-group-type-toggle');
+    const methodGroup      = document.getElementById('form-group-method');
+    const settlementGroup  = document.getElementById('form-group-settlement');
+    const catSelect        = document.getElementById('txn-category');
+    const descInput        = document.getElementById('txn-description');
+    const title            = document.getElementById('modal-form-title');
+
+    // Default visibility
+    if (typeToggleGroup) typeToggleGroup.style.display = '';
+    if (methodGroup)     methodGroup.style.display = '';
+    if (settlementGroup) settlementGroup.style.display = '';
+
+    const titles = {
+      sale: 'Record Cash Sale',
+      expense: 'Record Cash Expense',
+      withdrawal: 'Record Personal Withdrawal',
+      payment: 'Add Upcoming Obligation',
+    };
+    if (title) title.textContent = titles[type] || 'Record Entry';
+
+    const saleBtn    = document.getElementById('type-toggle-sale');
+    const expenseBtn = document.getElementById('type-toggle-expense');
+
+    if (type === 'sale') {
+      if (saleBtn) saleBtn.classList.add('selected');
+      if (expenseBtn) expenseBtn.classList.remove('selected');
+      if (catSelect) catSelect.value = 'sales';
+      if (descInput) descInput.placeholder = 'e.g. Counter cash sales, order note...';
+    } else if (type === 'expense') {
+      if (expenseBtn) expenseBtn.classList.add('selected');
+      if (saleBtn) saleBtn.classList.remove('selected');
+      if (catSelect) catSelect.value = 'stock';
+      if (descInput) descInput.placeholder = 'e.g. Produce, shop supplies, transport...';
+    } else if (type === 'withdrawal') {
+      if (expenseBtn) expenseBtn.classList.add('selected');
+      if (saleBtn) saleBtn.classList.remove('selected');
+      if (typeToggleGroup) typeToggleGroup.style.display = 'none';
+      if (catSelect) catSelect.value = 'personal';
+      if (descInput) {
+        descInput.value = 'Personal Withdrawal';
+        descInput.placeholder = 'e.g. Owner personal drawing';
       }
+    } else if (type === 'payment') {
+      if (typeToggleGroup) typeToggleGroup.style.display = 'none';
+      if (methodGroup) methodGroup.style.display = 'none';
+      if (settlementGroup) settlementGroup.style.display = 'none';
+      if (catSelect) catSelect.value = 'supplier';
+      if (descInput) descInput.placeholder = 'e.g. Supplier payment, shop rent...';
     }
 
-    // Update modal title
-    const title = document.getElementById('modal-form-title');
-    if (title) {
-      const titles = {
-        sale: 'Record a Sale',
-        expense: 'Record an Expense',
-        payment: 'Add Upcoming Payment',
-      };
-      title.textContent = titles[type] || 'Add Transaction';
-    }
-
-    // Store the selected type on the form
     if (formScreen) formScreen.dataset.currentType = type;
   }
 
@@ -102,16 +132,19 @@ const AddTransaction = (() => {
   function collectFormData() {
     const currentType = formScreen?.dataset.currentType || 'sale';
 
-    // Determine type from toggle if user changed it
     const expenseBtn = document.getElementById('type-toggle-expense');
-    const isExpense  = expenseBtn && expenseBtn.classList.contains('selected');
-    const type = (currentType === 'expense' || isExpense)
-      ? 'expense'
-      : 'sale';
+    const isExpense  = (currentType === 'expense' || currentType === 'withdrawal') || (expenseBtn && expenseBtn.classList.contains('selected'));
+    const type = isExpense ? 'expense' : 'sale';
 
     const amount      = parseFloat(document.getElementById('txn-amount')?.value) || 0;
-    const category    = document.getElementById('txn-category')?.value || 'other';
-    const description = document.getElementById('txn-description')?.value.trim() || '';
+    const category    = document.getElementById('txn-category')?.value || (currentType === 'withdrawal' ? 'personal' : 'other');
+    let description   = document.getElementById('txn-description')?.value.trim();
+
+    if (!description) {
+      if (currentType === 'withdrawal') description = 'Personal Withdrawal';
+      else if (type === 'sale') description = 'Cash Sale';
+      else description = 'Cash Expense';
+    }
 
     // Settlement status
     const settledBtn = document.getElementById('settle-settled');
@@ -119,12 +152,25 @@ const AddTransaction = (() => {
       ? 'settled'
       : 'pending';
 
-    return { type, amount, paymentMethod: selectedMethod, settlementStatus, category, description };
+    const channel = currentType === 'withdrawal'
+      ? 'Personal Drawing'
+      : (selectedMethod === 'cash' ? 'Counter Cash' : 'Manual Entry');
+
+    return {
+      source: 'manual',
+      type,
+      amount,
+      paymentMethod: selectedMethod,
+      channel,
+      settlementStatus,
+      category,
+      description,
+    };
   }
 
   /** Collect data for an Upcoming Payment */
   function collectPaymentData() {
-    const title       = document.getElementById('txn-description')?.value.trim() || 'Payment';
+    const title       = document.getElementById('txn-description')?.value.trim() || 'Upcoming Obligation';
     const amount      = parseFloat(document.getElementById('txn-amount')?.value) || 0;
     const category    = document.getElementById('txn-category')?.value || 'other';
     return { title, amount, category };
@@ -232,9 +278,10 @@ const AddTransaction = (() => {
     });
 
     // Type selector
-    document.getElementById('add-type-sale')?.addEventListener('click',    () => showFormScreen('sale'));
-    document.getElementById('add-type-expense')?.addEventListener('click', () => showFormScreen('expense'));
-    document.getElementById('add-type-payment')?.addEventListener('click', () => showFormScreen('payment'));
+    document.getElementById('add-type-sale')?.addEventListener('click',       () => showFormScreen('sale'));
+    document.getElementById('add-type-expense')?.addEventListener('click',    () => showFormScreen('expense'));
+    document.getElementById('add-type-withdrawal')?.addEventListener('click', () => showFormScreen('withdrawal'));
+    document.getElementById('add-type-payment')?.addEventListener('click',    () => showFormScreen('payment'));
 
     // Form interactions
     initPaymentMethodBtns();
@@ -262,7 +309,6 @@ const AddTransaction = (() => {
     }
 
     if (typeof AppState === 'undefined') {
-      // AppState not available — just close
       close();
       return;
     }
@@ -271,23 +317,28 @@ const AddTransaction = (() => {
       // Save upcoming payment
       const data = collectPaymentData();
       AppState.addPayment(data);
-      showSuccess('Upcoming payment added');
+      showSuccess('Upcoming obligation added');
     } else {
-      // Save transaction (sale or expense)
+      // Save transaction (cash sale, cash expense, withdrawal)
       const data = collectFormData();
       AppState.addTransaction(data);
 
-      // Refresh the transactions page list if it's rendered
+      // Refresh the transactions page list if active
       if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') {
         Transactions.render();
       }
 
-      // Refresh dashboard metrics if dashboard is active
+      // Refresh dashboard metrics
       if (typeof Dashboard !== 'undefined' && typeof Dashboard.renderSummary === 'function') {
         Dashboard.renderSummary();
       }
 
-      showSuccess('Transaction recorded');
+      // Refresh reports metrics
+      if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') {
+        Reports.renderMetrics();
+      }
+
+      showSuccess(currentType === 'withdrawal' ? 'Personal withdrawal recorded' : 'Transaction recorded');
     }
 
     close();

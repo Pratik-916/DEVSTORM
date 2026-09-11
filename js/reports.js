@@ -10,7 +10,7 @@ const Reports = (() => {
   let chartInstance = null;
 
   /**
-   * Update the four metric card values on the Reports page.
+   * Update the metric card values and chart data on the Reports page.
    */
   function renderMetrics() {
     if (typeof AppState === 'undefined') return;
@@ -28,7 +28,7 @@ const Reports = (() => {
     setText('report-available-cash',    fmt(s.availableCash));
     setText('report-pending-money',     fmt(s.pendingSettlement));
 
-    // Net position
+    // Net position (Sales - Expenses)
     const net = s.totalSales - s.totalExpenses;
     setText('report-net-position', fmt(Math.max(0, net)));
 
@@ -37,6 +37,12 @@ const Reports = (() => {
       ? Math.round((s.availableCash / s.totalSales) * 100)
       : 0;
     setText('report-cash-conversion', conversion + '%');
+
+    // If chart already exists, update its data points
+    if (chartInstance && chartInstance.data && chartInstance.data.datasets[0]) {
+      chartInstance.data.datasets[0].data = [s.totalSales, s.totalExpenses, s.availableCash, s.pendingSettlement];
+      chartInstance.update();
+    }
   }
 
   /**

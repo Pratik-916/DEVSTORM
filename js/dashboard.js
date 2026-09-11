@@ -11,7 +11,7 @@ const Dashboard = (() => {
   let chartInstance = null;
 
   /**
-   * Render the 4 summary metric cards from AppState.
+   * Render the summary metric cards and advisor message from AppState.
    * Updates text content of existing DOM elements — no HTML is replaced.
    */
   function renderSummary() {
@@ -26,12 +26,12 @@ const Dashboard = (() => {
       if (el) el.textContent = value;
     }
 
-    setText('metric-total-sales',       fmt(s.totalSales));
-    setText('metric-available-cash',    fmt(s.availableCash));
-    setText('metric-pending-settlement',fmt(s.pendingSettlement));
-    setText('metric-total-expenses',    fmt(s.totalExpenses));
-    setText('metric-safe-to-spend',     fmt(s.safeToSpend));
-    setText('metric-cash-pos-amount',   fmt(s.availableCash));
+    setText('metric-total-sales',        fmt(s.totalSales));
+    setText('metric-available-cash',     fmt(s.availableCash));
+    setText('metric-pending-settlement', fmt(s.pendingSettlement));
+    setText('metric-total-expenses',     fmt(s.totalExpenses));
+    setText('metric-safe-to-spend',      fmt(s.safeToSpend));
+    setText('metric-cash-pos-amount',    fmt(s.availableCash));
 
     // Cash Health badge
     const badge = document.getElementById('cash-health-badge');
@@ -52,6 +52,12 @@ const Dashboard = (() => {
       } else {
         msg.textContent = 'Your upcoming payments are getting close to your available cash.';
       }
+    }
+
+    // Update live values in advisor card if present
+    const advisorMsg = document.querySelector('.advisor-message');
+    if (advisorMsg) {
+      advisorMsg.textContent = `Your cash looks stable, but ${fmt(s.pendingSettlement)} of your digital sales are pending settlement. Digital feeds from UPI, Card, and Bank are auto-synced.`;
     }
   }
 
@@ -155,5 +161,23 @@ const Dashboard = (() => {
     renderSummary();
   }
 
-  return { initChart, renderSummary };
+  function initSyncTriggers() {
+    const indicators = document.querySelectorAll('.sync-status-indicator');
+    indicators.forEach(ind => {
+      ind.addEventListener('click', () => {
+        if (typeof AppState !== 'undefined' && typeof AppState.syncFeed === 'function') {
+          AppState.syncFeed();
+        }
+      });
+    });
+  }
+
+  function init() {
+    initSyncTriggers();
+    renderSummary();
+  }
+
+  return { init, initChart, renderSummary };
 })();
+
+document.addEventListener('DOMContentLoaded', Dashboard.init);

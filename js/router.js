@@ -32,15 +32,27 @@ const Router = (() => {
       btn.classList.toggle('active', btn.dataset.page === page);
     });
 
-    // 5. Initialise charts on first visit
-    if (page === 'dashboard' && !initialised.dashboard) {
-      initialised.dashboard = true;
-      if (typeof Dashboard !== 'undefined') Dashboard.initChart();
+    // 5. Initialise charts and refresh views on visit
+    if (page === 'dashboard') {
+      if (!initialised.dashboard && typeof Dashboard !== 'undefined') {
+        initialised.dashboard = true;
+        Dashboard.initChart();
+      } else if (typeof Dashboard !== 'undefined') {
+        Dashboard.renderSummary();
+      }
     }
 
-    if (page === 'reports' && !initialised.reports) {
-      initialised.reports = true;
-      if (typeof Reports !== 'undefined') Reports.initChart();
+    if (page === 'transactions' && typeof Transactions !== 'undefined') {
+      Transactions.render();
+    }
+
+    if (page === 'reports') {
+      if (!initialised.reports && typeof Reports !== 'undefined') {
+        initialised.reports = true;
+        Reports.initChart();
+      } else if (typeof Reports !== 'undefined') {
+        Reports.renderMetrics();
+      }
     }
 
     // 6. Store current page

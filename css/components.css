@@ -175,6 +175,24 @@
   color: var(--c-primary-hover);
 }
 
+/* Feed source badges */
+.badge-auto {
+  background: var(--c-info-light);
+  color: var(--c-info);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.badge-manual {
+  background: var(--c-border-light);
+  color: var(--c-text-secondary);
+  border: 1px solid var(--c-border);
+}
+
+.badge-withdrawal {
+  background: #FDF2F8;
+  color: #DB2777;
+}
+
 /* ==============================================
    SUMMARY METRIC CARDS (4-card grid on dashboard)
    ============================================== */
@@ -478,6 +496,89 @@
 
 .txn-amount.positive { color: var(--c-primary); }
 .txn-amount.negative { color: var(--c-danger); }
+
+/* Channel Tag */
+.txn-channel-tag {
+  font-size: var(--text-xs);
+  color: var(--c-text-secondary);
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  padding: 1px 7px;
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: var(--fw-medium);
+}
+
+/* ==============================================
+   AUTO SYNC STATUS INDICATOR
+   ============================================== */
+.sync-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--t-base), border-color var(--t-base), box-shadow var(--t-base);
+  line-height: 1;
+}
+
+.sync-status-indicator:hover {
+  background: var(--c-primary-50);
+  border-color: var(--c-primary-light);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+}
+
+.sync-dot.syncing {
+  background: var(--c-info);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  animation: syncPulse 0.8s infinite alternate;
+}
+
+@keyframes syncPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.3); opacity: 1; }
+}
+
+.sync-text {
+  font-weight: var(--fw-semibold);
+  color: var(--c-text-primary);
+}
+
+.sync-separator {
+  color: var(--c-text-muted);
+}
+
+.sync-last-time {
+  color: var(--c-text-secondary);
+}
+
+.sync-icon-refresh {
+  width: 12px;
+  height: 12px;
+  color: var(--c-text-muted);
+  transition: transform var(--t-medium), color var(--t-base);
+}
+
+.sync-status-indicator:hover .sync-icon-refresh {
+  color: var(--c-primary);
+  transform: rotate(180deg);
+}
 
 /* ==============================================
    FILTER TABS
@@ -833,6 +934,11 @@ select.form-control {
 .add-type-icon.ti-payment {
   background: var(--c-warning-light);
   color: var(--c-warning);
+}
+
+.add-type-icon.ti-withdrawal {
+  background: #FDF2F8;
+  color: #DB2777;
 }
 
 .add-type-icon svg { width: 22px; height: 22px; }

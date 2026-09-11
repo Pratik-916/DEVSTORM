@@ -3,11 +3,11 @@
  * Manages the Activity / Transactions page.
  *
  * Responsibilities:
- *  - render() : builds the transaction list from AppState and injects it into the DOM
- *  - init()   : binds filter tab clicks (All / Sales / Expenses / Pending)
+ *  - render() : builds the transaction list from AppState with clear distinction
+ *               between manual entries and auto-imported digital transactions (UPI, Card, Bank, Credit).
+ *  - init()   : binds filter tab clicks (All / Auto-Imported / Cash & Manual / Sales / Expenses / Pending)
  *
- * The static HTML transaction items are replaced by JS-rendered content on init
- * so the list always reflects the current AppState (including newly added items).
+ * The transaction list dynamically reflects the live AppState.
  */
 
 'use strict';
@@ -16,7 +16,7 @@ const Transactions = (() => {
   const LIST_CONTAINER_ID = 'transaction-list-container';
 
   /* ----------------------------------------------------------
-     ICON HELPERS (inline SVGs matching the existing design)
+     ICON HELPERS (inline SVGs matching design system)
      ---------------------------------------------------------- */
   function iconSale() {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`;
@@ -29,11 +29,12 @@ const Transactions = (() => {
   }
 
   /* ----------------------------------------------------------
-     BUILD TRANSACTION HTML
+     BUILD TRANSACTION ITEM HTML
      ---------------------------------------------------------- */
   function buildTransactionItem(txn) {
-    const isPending = txn.settlementStatus === 'pending';
-    const isSale    = txn.type === 'sale';
+    const isPending    = txn.settlementStatus === 'pending';
+    const isSale       = txn.type === 'sale';
+    const isAuto       = txn.source === 'auto';
 
     // Icon class and SVG
     let iconClass, iconSvg;
@@ -54,21 +55,36 @@ const Transactions = (() => {
     const fmt           = (typeof AppState !== 'undefined') ? AppState.formatCurrency : (v) => '\u20b9' + v;
     const amountDisplay = sign + fmt(txn.amount);
 
+    // Source badge (Auto vs Manual)
+    const sourceBadge = isAuto
+      ? `<span class="badge badge-auto" title="Automatically imported digital feed">Auto</span>`
+      : `<span class="badge badge-manual" title="Manual cash entry">Manual</span>`;
+
     // Settlement badge
     const settleBadge = isPending
       ? `<span class="badge badge-pending">Pending</span>`
       : `<span class="badge badge-settled">Settled</span>`;
 
-    // data-type for filter: pending items get their own type
-    const dataType = isPending ? 'pending' : txn.type;
+    // Channel label
+    const channelTag = txn.channel
+      ? `<span class="txn-channel-tag">${escapeHtml(txn.channel)}</span>`
+      : '';
 
     return `
-      <div class="transaction-item" data-type="${dataType}" data-id="${txn.id}" role="article">
+      <div class="transaction-item"
+           data-type="${txn.type}"
+           data-source="${txn.source || 'manual'}"
+           data-settlement="${txn.settlementStatus || 'settled'}"
+           data-method="${txn.paymentMethod || 'cash'}"
+           data-id="${txn.id}"
+           role="article">
         <div class="txn-icon ${iconClass}" aria-hidden="true">${iconSvg}</div>
         <div class="txn-info">
           <p class="txn-name">${escapeHtml(txn.description || 'Transaction')}</p>
-          <div class="txn-meta">
+          <div class="txn-meta" style="flex-wrap:wrap;">
             <span class="txn-time">${escapeHtml(txn.time || '')}</span>
+            ${channelTag}
+            ${sourceBadge}
             ${settleBadge}
           </div>
         </div>
@@ -114,8 +130,8 @@ const Transactions = (() => {
             ${iconExpense()}
           </div>
           <p class="empty-state-title">No transactions yet</p>
-          <p class="empty-state-body">Your transactions will appear here once you record your first sale or expense.</p>
-          <button class="btn btn-primary" onclick="AddTransaction.open()">Add Transaction</button>
+          <p class="empty-state-body">Your transactions will appear here once digital feeds sync or you record a manual cash entry.</p>
+          <button class="btn btn-primary" onclick="AddTransaction.open()">Record Manual Entry</button>
         </div>`;
       return;
     }
@@ -140,11 +156,23 @@ const Transactions = (() => {
     const items = document.querySelectorAll(`#${LIST_CONTAINER_ID} .transaction-item`);
 
     items.forEach(item => {
+      let isVisible = false;
+
       if (filter === 'all') {
-        item.style.display = '';
-      } else {
-        item.style.display = (item.dataset.type === filter) ? '' : 'none';
+        isVisible = true;
+      } else if (filter === 'auto') {
+        isVisible = item.dataset.source === 'auto';
+      } else if (filter === 'manual') {
+        isVisible = item.dataset.source === 'manual';
+      } else if (filter === 'sale') {
+        isVisible = item.dataset.type === 'sale';
+      } else if (filter === 'expense') {
+        isVisible = item.dataset.type === 'expense' || item.dataset.type === 'withdrawal';
+      } else if (filter === 'pending') {
+        isVisible = item.dataset.settlement === 'pending';
       }
+
+      item.style.display = isVisible ? '' : 'none';
     });
 
     // Hide date groups with no visible items
@@ -176,7 +204,7 @@ const Transactions = (() => {
     });
   }
 
-  return { init, render };
+  return { init, render, applyFilter };
 })();
 
 document.addEventListener('DOMContentLoaded', Transactions.init);
