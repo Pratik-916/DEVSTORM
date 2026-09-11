@@ -17,10 +17,14 @@ const AddTransaction = (() => {
   // Track the currently selected payment method
   let selectedMethod = 'cash';
 
-  function open() {
+  function open(initialType) {
     if (!overlay) return;
     overlay.classList.add('open');
-    showTypeScreen();
+    if (initialType) {
+      showFormScreen(initialType);
+    } else {
+      showTypeScreen();
+    }
     document.body.style.overflow = 'hidden';
   }
 
@@ -43,6 +47,8 @@ const AddTransaction = (() => {
     const typeToggleGroup  = document.getElementById('form-group-type-toggle');
     const methodGroup      = document.getElementById('form-group-method');
     const settlementGroup  = document.getElementById('form-group-settlement');
+    const dueDateGroup     = document.getElementById('form-group-due-date');
+    const submitBtn        = document.getElementById('btn-add-transaction-submit');
     const catSelect        = document.getElementById('txn-category');
     const descInput        = document.getElementById('txn-description');
     const title            = document.getElementById('modal-form-title');
@@ -51,6 +57,8 @@ const AddTransaction = (() => {
     if (typeToggleGroup) typeToggleGroup.style.display = '';
     if (methodGroup)     methodGroup.style.display = '';
     if (settlementGroup) settlementGroup.style.display = '';
+    if (dueDateGroup)    dueDateGroup.classList.add('hidden');
+    if (submitBtn)       submitBtn.textContent = 'Add Transaction';
 
     const titles = {
       sale: 'Record Cash Sale',
@@ -86,6 +94,14 @@ const AddTransaction = (() => {
       if (typeToggleGroup) typeToggleGroup.style.display = 'none';
       if (methodGroup) methodGroup.style.display = 'none';
       if (settlementGroup) settlementGroup.style.display = 'none';
+      if (dueDateGroup) {
+        dueDateGroup.classList.remove('hidden');
+        const dueDateInput = document.getElementById('txn-due-date');
+        if (dueDateInput && !dueDateInput.value) {
+          dueDateInput.value = new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10);
+        }
+      }
+      if (submitBtn) submitBtn.textContent = 'Add Obligation';
       if (catSelect) catSelect.value = 'supplier';
       if (descInput) descInput.placeholder = 'e.g. Supplier payment, shop rent...';
     }
@@ -173,7 +189,9 @@ const AddTransaction = (() => {
     const title       = document.getElementById('txn-description')?.value.trim() || 'Upcoming Obligation';
     const amount      = parseFloat(document.getElementById('txn-amount')?.value) || 0;
     const category    = document.getElementById('txn-category')?.value || 'other';
-    return { title, amount, category };
+    const dueDateInput = document.getElementById('txn-due-date')?.value;
+    const dueDate     = dueDateInput || new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10);
+    return { title, amount, category, dueDate };
   }
 
   /** Show a brief inline confirmation message */

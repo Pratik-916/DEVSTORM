@@ -20,6 +20,15 @@ const Dashboard = (() => {
     const s = AppState.getSummary();
     const fmt = AppState.formatCurrency;
 
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     // Helper: safely set text on an element
     function setText(id, value) {
       const el = document.getElementById(id);
@@ -72,6 +81,38 @@ const Dashboard = (() => {
     const payTotal = document.querySelector('.payments-summary-amount');
     if (payTotal) {
       payTotal.textContent = fmt(s.upcomingObligations);
+    }
+
+    // Render live upcoming obligations on dashboard card
+    const upcomingList = document.getElementById('dashboard-upcoming-list');
+    if (upcomingList && typeof AppState.getPayments === 'function') {
+      const livePayments = AppState.getPayments().filter(p => p.status !== 'paid').slice(0, 4);
+      if (livePayments.length === 0) {
+        upcomingList.innerHTML = '<li style="padding:var(--sp-4);text-align:center;color:var(--c-text-muted);font-size:var(--text-sm);">No upcoming obligations due.</li>';
+      } else {
+        upcomingList.innerHTML = livePayments.map(p => {
+          const priorityClass = p.priority === 'essential' ? 'pi-essential' : (p.priority === 'high' ? 'pi-high' : 'pi-medium');
+          const badgeClass = p.priority === 'essential' ? 'badge-essential' : (p.priority === 'high' ? 'badge-high' : 'badge-medium');
+          return `
+            <li class="payment-item">
+              <div class="payment-icon ${priorityClass}" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="20" height="14" x="2" y="5" rx="2" />
+                  <line x1="2" x2="22" y1="10" y2="10" />
+                </svg>
+              </div>
+              <div class="payment-info">
+                <p class="payment-name">${escapeHtml(p.title)}</p>
+                <p class="payment-due">${escapeHtml(p.dueDateLabel || p.dueDate || 'Upcoming')}</p>
+              </div>
+              <div class="payment-right">
+                <span class="payment-amount">${fmt(p.amount)}</span>
+                <span class="badge ${badgeClass}" style="text-transform:capitalize;">${escapeHtml(p.priority || 'Due')}</span>
+              </div>
+            </li>
+          `;
+        }).join('');
+      }
     }
 
     // Update live values in advisor card if present

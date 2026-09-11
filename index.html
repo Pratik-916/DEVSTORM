@@ -616,7 +616,7 @@
                 </button>
               </div>
 
-              <ul aria-label="Upcoming payments list">
+              <ul aria-label="Upcoming payments list" id="dashboard-upcoming-list">
                 <!-- Supplier Payment -->
                 <li class="payment-item">
                   <div class="payment-icon pi-essential" aria-hidden="true">
@@ -797,127 +797,8 @@
             <p class="payments-summary-label">Due in the next 7 days</p>
           </div>
 
-          <!-- Group: Tomorrow -->
-          <div class="payment-group">
-            <p class="payment-group-header">Tomorrow <span class="payment-group-count">(1)</span></p>
-
-            <div class="payment-row">
-              <div class="payment-row-icon" style="background:var(--c-danger-light);color:var(--c-danger);"
-                aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect width="20" height="14" x="2" y="5" rx="2" />
-                  <line x1="2" x2="22" y1="10" y2="10" />
-                </svg>
-              </div>
-              <div class="payment-row-info">
-                <p class="payment-row-name">Supplier Payment</p>
-                <p class="payment-row-amount">Due: Tomorrow, 27 Nov</p>
-              </div>
-              <div class="payment-row-right">
-                <span class="payment-row-value">&#8377;3,000</span>
-                <span class="badge badge-essential">Essential</span>
-              </div>
-              <div class="payment-row-chevron" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Group: In 3 days -->
-          <div class="payment-group">
-            <p class="payment-group-header">In 3 days <span class="payment-group-count">(1)</span></p>
-
-            <div class="payment-row">
-              <div class="payment-row-icon" style="background:var(--c-danger-light);color:var(--c-danger);"
-                aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              </div>
-              <div class="payment-row-info">
-                <p class="payment-row-name">Rent</p>
-                <p class="payment-row-amount">Due: 29 Nov</p>
-              </div>
-              <div class="payment-row-right">
-                <span class="payment-row-value">&#8377;5,000</span>
-                <span class="badge badge-essential">Essential</span>
-              </div>
-              <div class="payment-row-chevron" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Group: In 5 days -->
-          <div class="payment-group">
-            <p class="payment-group-header">In 5 days <span class="payment-group-count">(1)</span></p>
-
-            <div class="payment-row">
-              <div class="payment-row-icon" style="background:var(--c-warning-light);color:var(--c-warning);"
-                aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </div>
-              <div class="payment-row-info">
-                <p class="payment-row-name">Wages</p>
-                <p class="payment-row-amount">Due: 1 Dec</p>
-              </div>
-              <div class="payment-row-right">
-                <span class="payment-row-value">&#8377;2,500</span>
-                <span class="badge badge-high">High</span>
-              </div>
-              <div class="payment-row-chevron" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Group: In 6 days -->
-          <div class="payment-group">
-            <p class="payment-group-header">In 6 days <span class="payment-group-count">(1)</span></p>
-
-            <div class="payment-row">
-              <div class="payment-row-icon" style="background:var(--c-info-light);color:var(--c-info);"
-                aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-              </div>
-              <div class="payment-row-info">
-                <p class="payment-row-name">Utilities</p>
-                <p class="payment-row-amount">Due: 2 Dec</p>
-              </div>
-              <div class="payment-row-right">
-                <span class="payment-row-value">&#8377;1,200</span>
-                <span class="badge badge-medium">Medium</span>
-              </div>
-              <div class="payment-row-chevron" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
+          <!-- Dynamic obligations container from Supabase -->
+          <div id="payments-list-container"></div>
         </section>
         <!-- /PAGE: PAYMENTS -->
 
@@ -1159,6 +1040,20 @@
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </div>
+            </div>
+          </div>
+
+          <!-- Financial Accounts -->
+          <div class="settings-group" id="settings-financial-accounts-group">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-2);">
+              <p class="settings-group-label" style="margin-bottom:0;">Financial Accounts</p>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-settings-add-account" style="font-size:12px;padding:4px 10px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                Add Account
+              </button>
+            </div>
+            <div id="settings-accounts-list">
+              <!-- Dynamically populated from Supabase financial_accounts -->
             </div>
           </div>
 
@@ -1745,6 +1640,12 @@
               aria-label="Transaction description" />
           </div>
 
+          <!-- Due Date (for upcoming obligations) -->
+          <div class="form-group hidden" id="form-group-due-date" style="margin-top:var(--sp-4);margin-bottom:0;">
+            <label class="form-label" for="txn-due-date">Due Date</label>
+            <input class="form-control" type="date" id="txn-due-date" aria-label="Due date" />
+          </div>
+
         </div>
 
         <div class="modal-footer">
@@ -2041,6 +1942,7 @@
   <script src="js/router.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/transactions.js"></script>
+  <script src="js/payments.js"></script>
   <script src="js/reports.js"></script>
   <script src="js/addtransaction.js"></script>
   <script src="js/connectaccount.js"></script>

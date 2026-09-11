@@ -71,9 +71,9 @@ const SupabaseService = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       try {
         return crypto.randomUUID();
-      } catch (e) {}
+      } catch (e) { }
     }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
@@ -89,7 +89,7 @@ const SupabaseService = (() => {
     try {
       const cached = localStorage.getItem('cashly_auth_session');
       if (cached) _session = JSON.parse(cached);
-    } catch (e) {}
+    } catch (e) { }
 
     const authHeaders = () => {
       const h = {
@@ -133,7 +133,7 @@ const SupabaseService = (() => {
             const userObj = data.user || data;
             if (data.access_token) {
               _session = { user: userObj, access_token: data.access_token };
-              try { localStorage.setItem('cashly_auth_session', JSON.stringify(_session)); } catch (e) {}
+              try { localStorage.setItem('cashly_auth_session', JSON.stringify(_session)); } catch (e) { }
             }
             return { data: { user: userObj, session: _session }, error: null };
           } catch (err) {
@@ -159,7 +159,7 @@ const SupabaseService = (() => {
             }
 
             _session = { user: data.user, access_token: data.access_token };
-            try { localStorage.setItem('cashly_auth_session', JSON.stringify(_session)); } catch (e) {}
+            try { localStorage.setItem('cashly_auth_session', JSON.stringify(_session)); } catch (e) { }
             return { data: { user: data.user, session: _session }, error: null };
           } catch (err) {
             return { data: null, error: err };
@@ -167,7 +167,7 @@ const SupabaseService = (() => {
         },
         async signOut() {
           _session = null;
-          try { localStorage.removeItem('cashly_auth_session'); } catch (e) {}
+          try { localStorage.removeItem('cashly_auth_session'); } catch (e) { }
           return { error: null };
         },
       },
@@ -361,14 +361,14 @@ const SupabaseService = (() => {
         if (session && session.user) {
           _currentUser = session.user;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       // Check local storage fallback
       if (!_currentUser) {
         try {
           const cached = localStorage.getItem('cashly_auth_user');
           if (cached) _currentUser = JSON.parse(cached);
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // Check cached active business
@@ -376,7 +376,7 @@ const SupabaseService = (() => {
         try {
           const cachedBiz = localStorage.getItem('cashly_user_business_' + _currentUser.id);
           if (cachedBiz) _currentBusiness = JSON.parse(cachedBiz);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
 
@@ -409,7 +409,7 @@ const SupabaseService = (() => {
           _currentUser = user;
           return _currentUser;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     try {
       const cached = localStorage.getItem('cashly_auth_user');
@@ -417,7 +417,7 @@ const SupabaseService = (() => {
         _currentUser = JSON.parse(cached);
         return _currentUser;
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   }
 
@@ -460,7 +460,7 @@ const SupabaseService = (() => {
           try {
             localStorage.setItem('cashly_pending_user_' + email.toLowerCase().trim(), JSON.stringify(fallbackUser));
             localStorage.setItem('cashly_auth_user', JSON.stringify(fallbackUser));
-          } catch (e) {}
+          } catch (e) { }
           _currentUser = fallbackUser;
           // Create business profile for this new user
           await getOrCreateBusiness(fallbackUser);
@@ -475,7 +475,7 @@ const SupabaseService = (() => {
       if (user) {
         try {
           localStorage.setItem('cashly_pending_user_' + email.toLowerCase().trim(), JSON.stringify(user));
-        } catch (e) {}
+        } catch (e) { }
         // Create business profile for this new user
         await getOrCreateBusiness(user);
       }
@@ -484,7 +484,7 @@ const SupabaseService = (() => {
         _currentUser = user;
         try {
           localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
-        } catch (e) {}
+        } catch (e) { }
       }
 
       return { user, session, error: null };
@@ -514,7 +514,7 @@ const SupabaseService = (() => {
           _currentUser = JSON.parse(cached);
           try {
             localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
-          } catch (e) {}
+          } catch (e) { }
           await getOrCreateBusiness(_currentUser);
           return { user: _currentUser, session: { user: _currentUser }, error: null };
         }
@@ -528,7 +528,7 @@ const SupabaseService = (() => {
         _currentUser = user;
         try {
           localStorage.setItem('cashly_auth_user', JSON.stringify(_currentUser));
-        } catch (e) {}
+        } catch (e) { }
         await getOrCreateBusiness(user);
       }
 
@@ -546,7 +546,7 @@ const SupabaseService = (() => {
     if (isConnected()) {
       try {
         await _client.auth.signOut();
-      } catch (e) {}
+      } catch (e) { }
     }
     _currentUser = null;
     _currentBusiness = null;
@@ -554,7 +554,7 @@ const SupabaseService = (() => {
       localStorage.removeItem('cashly_auth_user');
       localStorage.removeItem('cashly_auth_session');
       localStorage.removeItem('cashly_active_business');
-    } catch (e) {}
+    } catch (e) { }
     return true;
   }
 
@@ -567,7 +567,7 @@ const SupabaseService = (() => {
         localStorage.removeItem('cashly_auth_user');
         localStorage.removeItem('cashly_auth_session');
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   /* ============================================================
@@ -579,7 +579,7 @@ const SupabaseService = (() => {
     try {
       const cached = localStorage.getItem('cashly_active_business');
       if (cached) _currentBusiness = JSON.parse(cached);
-    } catch (e) {}
+    } catch (e) { }
     return _currentBusiness;
   }
 
@@ -594,7 +594,7 @@ const SupabaseService = (() => {
       } else {
         localStorage.removeItem('cashly_active_business');
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   /**
@@ -616,7 +616,7 @@ const SupabaseService = (() => {
         setBusiness(_currentBusiness);
         return _currentBusiness;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     await ensureConnected();
 
@@ -653,119 +653,8 @@ const SupabaseService = (() => {
         if (res && res.data && res.data[0]) {
           newBusiness = res.data[0];
         }
-
-        // Seed initial demo transactions and obligations in Supabase for this new business
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-        const initialTxns = [
-          {
-            id: 'txn-seed-1-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            user_id: user.id,
-            type: 'sale',
-            amount: 4500,
-            source: 'manual',
-            payment_method: 'cash',
-            settlement_status: 'settled',
-            category: 'sales',
-            channel: 'Counter Cash',
-            reference: 'CASH-REC-101',
-            description: 'Morning Cash Register Total',
-            transaction_date: todayStr,
-            created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-          },
-          {
-            id: 'txn-seed-2-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            user_id: user.id,
-            type: 'expense',
-            amount: 1500,
-            source: 'manual',
-            payment_method: 'cash',
-            settlement_status: 'settled',
-            category: 'stock',
-            channel: 'Counter Cash',
-            reference: 'EXP-CASH-044',
-            description: 'Stock Purchase - Fresh Produce',
-            transaction_date: todayStr,
-            created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
-          },
-          {
-            id: 'txn-seed-3-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            user_id: user.id,
-            type: 'withdrawal',
-            amount: 500,
-            source: 'manual',
-            payment_method: 'cash',
-            settlement_status: 'settled',
-            category: 'personal',
-            channel: 'Personal Drawing',
-            reference: 'WD-OWNER-012',
-            description: 'Personal Withdrawal',
-            transaction_date: todayStr,
-            created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-          },
-          {
-            id: 'txn-seed-4-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            user_id: user.id,
-            type: 'sale',
-            amount: 6200,
-            source: 'manual',
-            payment_method: 'cash',
-            settlement_status: 'settled',
-            category: 'sales',
-            channel: 'Counter Cash',
-            reference: 'CASH-REC-102',
-            description: 'Evening Cash Register Total',
-            transaction_date: yesterdayStr,
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-          },
-        ];
-        await _client.from('transactions').insert(initialTxns);
-
-        const initialObligations = [
-          {
-            id: 'pay-seed-1-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            title: 'Supplier Payment',
-            amount: 3000,
-            due_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-            status: 'due',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'pay-seed-2-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            title: 'Shop Rent',
-            amount: 5000,
-            due_date: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10),
-            status: 'due',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'pay-seed-3-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            title: 'Staff Wages',
-            amount: 2500,
-            due_date: new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 10),
-            status: 'due',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'pay-seed-4-' + newBusiness.id.slice(0, 8),
-            business_id: newBusiness.id,
-            title: 'Electricity & Utilities',
-            amount: 1200,
-            due_date: new Date(Date.now() + 86400000 * 6).toISOString().slice(0, 10),
-            status: 'due',
-            created_at: new Date().toISOString(),
-          },
-        ];
-        await _client.from('upcoming_obligations').insert(initialObligations);
       } catch (err) {
-        console.warn('[Cashly] Notice creating business profile and initial seed in Supabase:', err.message || err);
+        console.warn('[Cashly] Notice creating business profile in Supabase:', err.message || err);
       }
     }
 
@@ -786,7 +675,7 @@ const SupabaseService = (() => {
     if (row.created_at) {
       try {
         formattedTime = new Date(row.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return {
@@ -1006,6 +895,142 @@ const SupabaseService = (() => {
   }
 
   /* ============================================================
+     FINANCIAL ACCOUNTS PERSISTENCE METHODS
+     ============================================================ */
+
+  function generateUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function isUUID(str) {
+    return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  }
+
+  function mapRowToAccount(row) {
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      name: row.name,
+      type: row.type || 'Bank', // Bank, UPI, Card, Cash, Credit
+      provider: row.provider || row.name,
+      status: row.status || 'connected',
+      createdAt: row.created_at || new Date().toISOString(),
+    };
+  }
+
+  function mapAccountToRow(acc) {
+    const businessId = acc.businessId || (_currentBusiness ? _currentBusiness.id : null);
+    return {
+      id: isUUID(acc.id) ? acc.id : generateUUID(),
+      business_id: businessId,
+      name: acc.name,
+      type: acc.type || 'Bank',
+      provider: acc.provider || acc.name,
+      status: acc.status || 'connected',
+      created_at: acc.createdAt || new Date().toISOString(),
+    };
+  }
+
+  async function fetchFinancialAccounts() {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    try {
+      let query = _client.from('financial_accounts').select('*');
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      }
+      if (query && typeof query.order === 'function') {
+        query = query.order('created_at', { ascending: true });
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice fetching financial accounts from Supabase:', error.message || error);
+        return null;
+      }
+      return (data || []).map(mapRowToAccount);
+    } catch (err) {
+      console.warn('[Cashly] Notice fetching financial accounts from Supabase:', err.message || err);
+      return null;
+    }
+  }
+
+  async function insertFinancialAccount(acc) {
+    await ensureConnected();
+    if (!isConnected()) return false;
+
+    try {
+      const row = mapAccountToRow(acc);
+      const { data, error } = await _client.from('financial_accounts').upsert([row], { onConflict: 'id' });
+      if (error) {
+        console.warn('[Cashly] Notice inserting financial account in Supabase:', error.message || error);
+        return false;
+      }
+      return row;
+    } catch (err) {
+      console.warn('[Cashly] Notice inserting financial account in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  async function updateFinancialAccount(id, updates) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const dbUpdates = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.type !== undefined) dbUpdates.type = updates.type;
+      if (updates.provider !== undefined) dbUpdates.provider = updates.provider;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+
+      let query = _client.from('financial_accounts').update(dbUpdates).eq('id', id);
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      }
+
+      const { error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice updating financial account in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice updating financial account in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  async function deleteFinancialAccount(id) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      let query = _client.from('financial_accounts').delete().eq('id', id);
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      }
+      const { error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice deleting financial account in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice deleting financial account in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  /* ============================================================
      UPCOMING OBLIGATIONS PERSISTENCE METHODS
      ============================================================ */
 
@@ -1044,7 +1069,7 @@ const SupabaseService = (() => {
   function mapObligationToRow(ob) {
     const businessId = ob.businessId || (_currentBusiness ? _currentBusiness.id : null);
     return {
-      id: ob.id,
+      id: ob.id || ('pay-' + Date.now()),
       business_id: businessId,
       title: ob.title,
       amount: Number(ob.amount) || 0,
@@ -1085,14 +1110,42 @@ const SupabaseService = (() => {
 
     try {
       const row = mapObligationToRow(ob);
-      const { error } = await _client.from('upcoming_obligations').upsert([row], { onConflict: 'id' });
+      const { data, error } = await _client.from('upcoming_obligations').upsert([row], { onConflict: 'id' });
       if (error) {
         console.warn('[Cashly] Notice inserting obligation in Supabase:', error.message || error);
         return false;
       }
-      return true;
+      return row;
     } catch (err) {
       console.warn('[Cashly] Notice inserting obligation in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  async function updateObligation(id, updates) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const dbUpdates = {};
+      if (updates.title !== undefined) dbUpdates.title = updates.title;
+      if (updates.amount !== undefined) dbUpdates.amount = Number(updates.amount) || 0;
+      if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+
+      let query = _client.from('upcoming_obligations').update(dbUpdates).eq('id', id);
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      }
+
+      const { error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice updating obligation in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice updating obligation in Supabase:', err.message || err);
       return false;
     }
   }
@@ -1136,8 +1189,13 @@ const SupabaseService = (() => {
     insertTransactions,
     updateTransaction,
     deleteTransaction,
+    fetchFinancialAccounts,
+    insertFinancialAccount,
+    updateFinancialAccount,
+    deleteFinancialAccount,
     fetchObligations,
     insertObligation,
+    updateObligation,
     deleteObligation,
   };
 })();

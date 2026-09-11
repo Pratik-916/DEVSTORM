@@ -36,12 +36,12 @@ const BUSINESS = {
 /* ----------------------------------------------------------
    CONSTANTS (enum-style)
    ---------------------------------------------------------- */
-const TRANSACTION_SOURCES    = { MANUAL: 'manual', AUTO: 'auto' };
-const TRANSACTION_TYPES      = { SALE: 'sale', EXPENSE: 'expense', WITHDRAWAL: 'withdrawal' };
-const PAYMENT_METHODS        = { CASH: 'cash', UPI: 'upi', CARD: 'card', BANK: 'bank_transfer', CREDIT: 'credit' };
-const SETTLEMENT_STATUSES    = { SETTLED: 'settled', PENDING: 'pending' };
-const PAYMENT_PRIORITIES     = { ESSENTIAL: 'essential', HIGH: 'high', MEDIUM: 'medium', LOW: 'low' };
-const PAYMENT_STATUSES       = { DUE: 'due', PAID: 'paid', OVERDUE: 'overdue' };
+const TRANSACTION_SOURCES = { MANUAL: 'manual', AUTO: 'auto' };
+const TRANSACTION_TYPES = { SALE: 'sale', EXPENSE: 'expense', WITHDRAWAL: 'withdrawal' };
+const PAYMENT_METHODS = { CASH: 'cash', UPI: 'upi', CARD: 'card', BANK: 'bank_transfer', CREDIT: 'credit' };
+const SETTLEMENT_STATUSES = { SETTLED: 'settled', PENDING: 'pending' };
+const PAYMENT_PRIORITIES = { ESSENTIAL: 'essential', HIGH: 'high', MEDIUM: 'medium', LOW: 'low' };
+const PAYMENT_STATUSES = { DUE: 'due', PAID: 'paid', OVERDUE: 'overdue' };
 
 /* ----------------------------------------------------------
    SEED: BASE TRANSACTIONS (Before connecting digital accounts)
@@ -366,6 +366,18 @@ const DigitalFeedProvider = (() => {
     });
   }
 
+  function setConnected(val) {
+    _isAccountConnected = !!val;
+    if (_isAccountConnected) {
+      _autoSync = true;
+      if (!_lastSynced) _lastSynced = new Date();
+    } else {
+      _autoSync = false;
+      _lastSynced = null;
+    }
+    notify();
+  }
+
   return {
     getStatus,
     connectAccount,
@@ -373,6 +385,7 @@ const DigitalFeedProvider = (() => {
     syncNow,
     subscribe,
     formatSyncTime,
+    setConnected,
   };
 })();
 
@@ -386,6 +399,7 @@ const AppState = (() => {
   const _store = {
     currentUser: null,
     transactions: [],
+    financialAccounts: [],
     payments: [],
     business: { ...BUSINESS },
     syncStatus: DigitalFeedProvider.getStatus(),
@@ -422,8 +436,11 @@ const AppState = (() => {
 
   function reset() {
     _store.transactions = [];
+    _store.financialAccounts = [];
+    _store.payments = [];
     _store.currentUser = null;
     _store.business = { ...BUSINESS };
+    DigitalFeedProvider.setConnected(false);
     refreshAllViews();
   }
 
@@ -436,7 +453,8 @@ const AppState = (() => {
       userId: user ? user.id : null,
       businessId: biz ? biz.id : null,
     }));
-    _store.payments     = SEED_PAYMENTS.map(p => ({ ...p }));
+    _store.payments = SEED_PAYMENTS.map(p => ({ ...p }));
+    _store.financialAccounts = [];
 
     // Listen to feed status updates
     DigitalFeedProvider.subscribe(status => {
@@ -446,7 +464,7 @@ const AppState = (() => {
 
     updateSyncUI(DigitalFeedProvider.getStatus());
 
-    // Connect to Supabase and load persisted transactions
+    // Connect to Supabase and load persisted transactions, accounts, obligations
     if (typeof SupabaseService !== 'undefined') {
       SupabaseService.init().then(connected => {
         if (connected) {
@@ -461,8 +479,9 @@ const AppState = (() => {
     if (!_store.currentUser) return;
 
     try {
-      const [supaTxns, supaObligations] = await Promise.all([
+      const [supaTxns, supaAccs, supaObligations] = await Promise.all([
         SupabaseService.fetchTransactions(),
+        SupabaseService.fetchFinancialAccounts(),
         SupabaseService.fetchObligations(),
       ]);
 
@@ -471,22 +490,20 @@ const AppState = (() => {
       const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
       const bizId = biz?.id || 'default';
 
+      // 1. Transactions
       if (Array.isArray(supaTxns)) {
         if (supaTxns.length > 0) {
           _store.transactions = supaTxns;
         } else {
-          // If 0 transactions returned from Supabase:
-          // Check if this business was never seeded
+          // If 0 transactions returned from Supabase, check if seeded before
           const seedKey = 'cashly_seeded_' + bizId;
           const alreadySeeded = localStorage.getItem(seedKey);
           if (!alreadySeeded && _store.transactions.length > 0) {
             const user = _store.currentUser;
-            if (user && user.id) {
-              _store.transactions.forEach(t => {
-                t.userId = user.id;
-                if (biz && biz.id) t.businessId = biz.id;
-              });
-            }
+            _store.transactions.forEach(t => {
+              t.userId = user ? user.id : null;
+              if (biz && biz.id) t.businessId = biz.id;
+            });
             await SupabaseService.insertTransactions(_store.transactions);
             try { localStorage.setItem(seedKey, '1'); } catch (e) {}
           } else {
@@ -495,26 +512,20 @@ const AppState = (() => {
         }
       }
 
+      // 2. Financial Accounts
+      if (Array.isArray(supaAccs)) {
+        _store.financialAccounts = supaAccs;
+        const hasConnected = supaAccs.some(a => a.status === 'connected');
+        DigitalFeedProvider.setConnected(hasConnected);
+      }
+
+      // 3. Upcoming Obligations
       if (Array.isArray(supaObligations)) {
-        if (supaObligations.length > 0) {
-          _store.payments = supaObligations;
-        } else {
-          const obSeedKey = 'cashly_ob_seeded_' + bizId;
-          const alreadySeededOb = localStorage.getItem(obSeedKey);
-          if (!alreadySeededOb && _store.payments.length > 0) {
-            for (const p of _store.payments) {
-              if (biz && biz.id) p.businessId = biz.id;
-              await SupabaseService.insertObligation(p);
-            }
-            try { localStorage.setItem(obSeedKey, '1'); } catch (e) {}
-          } else {
-            _store.payments = [];
-          }
-        }
+        _store.payments = supaObligations;
       }
 
       refreshAllViews();
-      console.log(`[Cashly] Hydrated ${_store.transactions.length} transactions and ${_store.payments.length} obligations from Supabase.`);
+      console.log(`[Cashly] Hydrated ${_store.transactions.length} txns, ${_store.financialAccounts.length} accounts, ${_store.payments.length} obligations from Supabase.`);
     } catch (err) {
       console.warn('[Cashly] Notice synchronizing with Supabase:', err.message || err);
     }
@@ -544,16 +555,33 @@ const AppState = (() => {
       }
 
       return batchToImport;
-    }).then(result => {
-      // Re-render UI components
+    }).then(async result => {
+      // Requirement 9: Store connected demo account in Supabase
+      const demoAccount = {
+        name: 'HDFC Bank - 8821',
+        type: 'Bank',
+        provider: 'HDFC Bank',
+        status: 'connected',
+      };
+      const existing = _store.financialAccounts.find(a => a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC')));
+      if (existing) {
+        await updateFinancialAccount(existing.id, { status: 'connected' });
+      } else {
+        await addFinancialAccount(demoAccount);
+      }
+
       refreshAllViews();
       return result;
     });
   }
 
   function disconnectAccountDemo() {
-    return DigitalFeedProvider.disconnectAccount(() => {
+    return DigitalFeedProvider.disconnectAccount(async () => {
       _store.transactions = SEED_BASE_TRANSACTIONS.map(t => ({ ...t }));
+      const existing = _store.financialAccounts.find(a => a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC')));
+      if (existing) {
+        await updateFinancialAccount(existing.id, { status: 'disconnected' });
+      }
       refreshAllViews();
     });
   }
@@ -565,6 +593,12 @@ const AppState = (() => {
     if (typeof Transactions !== 'undefined' && typeof Transactions.render === 'function') {
       Transactions.render();
     }
+    if (typeof Payments !== 'undefined' && typeof Payments.render === 'function') {
+      Payments.render();
+    }
+    if (typeof Settings !== 'undefined' && typeof Settings.renderAccounts === 'function') {
+      Settings.renderAccounts();
+    }
     if (typeof Reports !== 'undefined' && typeof Reports.renderMetrics === 'function') {
       Reports.renderMetrics();
     }
@@ -574,6 +608,93 @@ const AppState = (() => {
     if (typeof Admin !== 'undefined' && typeof Admin.render === 'function') {
       Admin.render();
     }
+  }
+
+  /* ---- Financial Accounts ---- */
+
+  function getFinancialAccounts() {
+    return [..._store.financialAccounts];
+  }
+
+  async function addFinancialAccount(accountData) {
+    const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
+    const allowedTypes = ['Bank', 'UPI', 'Card', 'Cash', 'Credit'];
+    const accType = allowedTypes.includes(accountData.type) ? accountData.type : 'Bank';
+
+    const isUUID = str => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    const newId = isUUID(accountData.id) ? accountData.id : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }));
+
+    const newAcc = {
+      id: newId,
+      businessId: biz ? biz.id : null,
+      name: accountData.name || 'Account',
+      type: accType,
+      provider: accountData.provider || accountData.name || accType,
+      status: accountData.status || 'connected',
+      createdAt: new Date().toISOString(),
+    };
+
+    _store.financialAccounts.push(newAcc);
+    if (newAcc.status === 'connected') {
+      DigitalFeedProvider.setConnected(true);
+    }
+    refreshAllViews();
+
+    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+      try {
+        const saved = await SupabaseService.insertFinancialAccount(newAcc);
+        if (saved && saved.id && saved.id !== newAcc.id) {
+          newAcc.id = saved.id;
+        }
+      } catch (err) {
+        console.warn('[Cashly] Notice inserting financial account in Supabase:', err.message || err);
+      }
+    }
+
+    return newAcc;
+  }
+
+  async function updateFinancialAccount(id, updates) {
+    const idx = _store.financialAccounts.findIndex(a => a.id === id);
+    if (idx !== -1) {
+      _store.financialAccounts[idx] = {
+        ..._store.financialAccounts[idx],
+        ...updates,
+      };
+      const hasConnected = _store.financialAccounts.some(a => a.status === 'connected');
+      DigitalFeedProvider.setConnected(hasConnected);
+      refreshAllViews();
+
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        try {
+          await SupabaseService.updateFinancialAccount(id, updates);
+        } catch (err) {
+          console.warn('[Cashly] Notice updating financial account in Supabase:', err.message || err);
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  async function deleteFinancialAccount(id) {
+    const idx = _store.financialAccounts.findIndex(a => a.id === id);
+    if (idx !== -1) {
+      _store.financialAccounts.splice(idx, 1);
+      const hasConnected = _store.financialAccounts.some(a => a.status === 'connected');
+      DigitalFeedProvider.setConnected(hasConnected);
+      refreshAllViews();
+
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        try {
+          await SupabaseService.deleteFinancialAccount(id);
+        } catch (err) {
+          console.warn('[Cashly] Notice deleting financial account from Supabase:', err.message || err);
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   /* ---- Transactions ---- */
@@ -600,9 +721,9 @@ const AppState = (() => {
 
     // Determine default channel label
     let defaultChannel = 'Counter Cash';
-    if (paymentMethod === PAYMENT_METHODS.UPI)    defaultChannel = 'UPI • Digital';
-    if (paymentMethod === PAYMENT_METHODS.CARD)   defaultChannel = 'Card • POS';
-    if (paymentMethod === PAYMENT_METHODS.BANK)   defaultChannel = 'Bank Transfer';
+    if (paymentMethod === PAYMENT_METHODS.UPI) defaultChannel = 'UPI • Digital';
+    if (paymentMethod === PAYMENT_METHODS.CARD) defaultChannel = 'Card • POS';
+    if (paymentMethod === PAYMENT_METHODS.BANK) defaultChannel = 'Bank Transfer';
     if (paymentMethod === PAYMENT_METHODS.CREDIT) defaultChannel = 'Credit • Ledger';
 
     const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
@@ -653,7 +774,7 @@ const AppState = (() => {
       refreshAllViews();
 
       if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-        SupabaseService.updateTransaction(id, updatedData).catch(err => {
+        SupabaseService.insertTransaction(_store.transactions[idx]).catch(err => {
           console.warn('[Cashly] Notice updating transaction in Supabase:', err.message || err);
         });
       }
@@ -693,51 +814,78 @@ const AppState = (() => {
   }
 
   /**
-   * Add a new upcoming payment / obligation.
+   * Add a new upcoming payment.
    * @param {Object} payData
    */
-  function addPayment(payData) {
+  async function addPayment(payData) {
     const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
     const newPay = {
-      id: 'pay-' + Date.now(),
+      id: payData.id || ('pay-' + Date.now()),
       businessId: biz ? biz.id : null,
       title: payData.title || 'Payment',
       amount: Number(payData.amount) || 0,
       dueDate: payData.dueDate || new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10),
-      dueDateLabel: payData.dueDateLabel || 'In 3 days',
+      dueDateLabel: payData.dueDateLabel || 'Upcoming',
       category: payData.category || 'other',
       priority: payData.priority || PAYMENT_PRIORITIES.MEDIUM,
-      status: PAYMENT_STATUSES.DUE,
-      description: payData.description || '',
+      status: payData.status || PAYMENT_STATUSES.DUE,
+      description: payData.description || payData.title || '',
       createdAt: new Date().toISOString(),
     };
     _store.payments.push(newPay);
     refreshAllViews();
 
     if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-      SupabaseService.insertObligation(newPay).catch(err => {
+      try {
+        await SupabaseService.insertObligation(newPay);
+      } catch (err) {
         console.warn('[Cashly] Notice saving obligation to Supabase:', err.message || err);
-      });
+      }
     }
 
     return newPay;
   }
 
   /**
-   * Delete an obligation by id
+   * Update an existing payment / obligation
    */
-  function deletePayment(id) {
+  async function updatePayment(id, updates) {
+    const idx = _store.payments.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      _store.payments[idx] = {
+        ..._store.payments[idx],
+        ...updates,
+      };
+      refreshAllViews();
+
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        try {
+          await SupabaseService.updateObligation(id, updates);
+        } catch (err) {
+          console.warn('[Cashly] Notice updating obligation in Supabase:', err.message || err);
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Delete a payment / obligation by id
+   */
+  async function deletePayment(id) {
     const idx = _store.payments.findIndex(p => p.id === id);
     if (idx !== -1) {
       _store.payments.splice(idx, 1);
       refreshAllViews();
 
       if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-        SupabaseService.deleteObligation(id).catch(err => {
+        try {
+          await SupabaseService.deleteObligation(id);
+        } catch (err) {
           console.warn('[Cashly] Notice deleting obligation from Supabase:', err.message || err);
-        });
+        }
       }
-
       return true;
     }
     return false;
@@ -783,13 +931,13 @@ const AppState = (() => {
 
     // Upcoming obligations: due payments from payment schedule
     const upcomingObligations = _store.payments
-      .filter(p => p.status === PAYMENT_STATUSES.DUE)
-      .reduce((sum, p) => sum + p.amount, 0);
+      .filter(p => p.status === PAYMENT_STATUSES.DUE || p.status === 'due')
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
     // Near-term essential obligations (e.g. rent / immediate essential due)
     const essentialObligations = _store.payments
-      .filter(p => p.status === PAYMENT_STATUSES.DUE && p.priority === PAYMENT_PRIORITIES.ESSENTIAL)
-      .reduce((sum, p) => sum + p.amount, 0);
+      .filter(p => (p.status === PAYMENT_STATUSES.DUE || p.status === 'due') && (p.priority === PAYMENT_PRIORITIES.ESSENTIAL || p.priority === 'essential'))
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
     // Safe to Spend: Available cash reduced by obligations
     const obligationDeduction = essentialObligations > 0 ? essentialObligations : Math.round(upcomingObligations * 0.6);
@@ -970,9 +1118,9 @@ const AppState = (() => {
 
   /** Get a human-readable date group label. */
   function getDateGroupLabel(dateStr) {
-    const today     = new Date().toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    if (dateStr === today)     return 'Today';
+    if (dateStr === today) return 'Today';
     if (dateStr === yesterday) return 'Yesterday';
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -992,8 +1140,13 @@ const AppState = (() => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    getFinancialAccounts,
+    addFinancialAccount,
+    updateFinancialAccount,
+    deleteFinancialAccount,
     getPayments,
     addPayment,
+    updatePayment,
     deletePayment,
     getSummary,
     getBusiness,

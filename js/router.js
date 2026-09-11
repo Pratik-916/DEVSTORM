@@ -69,6 +69,14 @@ const Router = (() => {
       Admin.render();
     }
 
+    if (page === 'payments' && typeof Payments !== 'undefined') {
+      Payments.render();
+    }
+
+    if (page === 'settings' && typeof Settings !== 'undefined' && typeof Settings.renderAccounts === 'function') {
+      Settings.renderAccounts();
+    }
+
     // 6. Store current page
     Router.currentPage = page;
 
