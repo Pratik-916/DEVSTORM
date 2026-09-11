@@ -477,6 +477,9 @@ const AppState = (() => {
     if (typeof Advisor !== 'undefined' && typeof Advisor.render === 'function') {
       Advisor.render();
     }
+    if (typeof Admin !== 'undefined' && typeof Admin.render === 'function') {
+      Admin.render();
+    }
   }
 
   /* ---- Transactions ---- */
@@ -535,6 +538,51 @@ const AppState = (() => {
     }
 
     return newTxn;
+  }
+
+  /**
+   * Update an existing transaction by id
+   */
+  function updateTransaction(id, updatedData) {
+    const idx = _store.transactions.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      _store.transactions[idx] = {
+        ..._store.transactions[idx],
+        ...updatedData,
+        amount: Number(updatedData.amount !== undefined ? updatedData.amount : _store.transactions[idx].amount),
+      };
+
+      refreshAllViews();
+
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        SupabaseService.insertTransaction(_store.transactions[idx]).catch(err => {
+          console.warn('[Cashly] Notice updating transaction in Supabase:', err.message || err);
+        });
+      }
+
+      return _store.transactions[idx];
+    }
+    return null;
+  }
+
+  /**
+   * Delete a transaction by id
+   */
+  function deleteTransaction(id) {
+    const idx = _store.transactions.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      const removed = _store.transactions.splice(idx, 1)[0];
+      refreshAllViews();
+
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        SupabaseService.deleteTransaction(id).catch(err => {
+          console.warn('[Cashly] Notice deleting transaction from Supabase:', err.message || err);
+        });
+      }
+
+      return true;
+    }
+    return false;
   }
 
   /* ---- Payments / Obligations ---- */
@@ -809,6 +857,8 @@ const AppState = (() => {
     getTransactions,
     getTransactionsBySource,
     addTransaction,
+    updateTransaction,
+    deleteTransaction,
     getPayments,
     addPayment,
     getSummary,

@@ -59,6 +59,10 @@ const Router = (() => {
       Advisor.render();
     }
 
+    if (page === 'admin' && typeof Admin !== 'undefined') {
+      Admin.render();
+    }
+
     // 6. Store current page
     Router.currentPage = page;
 

@@ -110,6 +110,15 @@
           </svg>
           <span>Settings</span>
         </button>
+
+        <button class="sidebar-nav-item" data-page="admin" aria-label="Admin Console">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+          <span>Admin Console</span>
+        </button>
       </nav>
 
       <!-- Footer -->
@@ -1192,6 +1201,89 @@
         <!-- /PAGE: SETTINGS -->
 
 
+        <!-- ================================================
+           PAGE: ADMIN CONSOLE
+           ================================================ -->
+        <section class="page" id="page-admin" data-page="admin" aria-label="Admin Console">
+
+          <div class="page-header-row" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h1 class="page-header-title">Admin Console</h1>
+              <p class="page-header-subtitle">Manage, live-edit, and delete user transactions &amp; Supabase data.</p>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="AppState.init(); if(typeof Admin!=='undefined') Admin.render();" title="Reload live data from Supabase">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                Sync Data
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="if(typeof Admin!=='undefined') Admin.openCreateModal();">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                Add Transaction
+              </button>
+            </div>
+          </div>
+
+          <!-- Admin stats bar -->
+          <div class="summary-cards" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom:var(--sp-6);">
+            <div class="summary-card">
+              <div class="summary-card-header"><span class="summary-card-label">Total Records</span></div>
+              <div class="summary-card-value" id="admin-stat-count" style="font-size:var(--text-xl);">0</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-card-header"><span class="summary-card-label">Total Sales</span></div>
+              <div class="summary-card-value value-green" id="admin-stat-sales" style="font-size:var(--text-xl);">&#8377;0</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-card-header"><span class="summary-card-label">Total Expenses</span></div>
+              <div class="summary-card-value value-red" id="admin-stat-expenses" style="font-size:var(--text-xl);">&#8377;0</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-card-header"><span class="summary-card-label">Database Status</span></div>
+              <div id="admin-stat-db" style="margin-top:4px;"><span class="badge badge-settled">Supabase</span></div>
+            </div>
+          </div>
+
+          <!-- Controls bar: Search & Filters -->
+          <div class="card card-pad" style="margin-bottom:var(--sp-4);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div style="flex:1; min-width:240px; position:relative;">
+                <input type="search" id="admin-search-input" class="form-input" placeholder="Search by description, reference, channel, ID..." style="width:100%; padding:8px 12px; font-size:var(--text-sm);">
+              </div>
+              <div class="filter-tabs" style="margin-bottom:0;">
+                <button class="filter-tab active" data-filter="all">All</button>
+                <button class="filter-tab" data-filter="sale">Sales</button>
+                <button class="filter-tab" data-filter="expense">Expenses</button>
+                <button class="filter-tab" data-filter="manual">Manual</button>
+                <button class="filter-tab" data-filter="auto">Auto</button>
+                <button class="filter-tab" data-filter="pending">Pending</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data table -->
+          <div class="card" style="overflow-x:auto; margin-bottom:var(--sp-8);">
+            <table class="admin-table" style="width:100%; border-collapse:collapse; text-align:left; font-size:var(--text-sm);">
+              <thead>
+                <tr style="border-bottom:1px solid var(--c-border); background:var(--c-surface-secondary); color:var(--c-text-secondary); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.04em;">
+                  <th style="padding:12px 16px;">Date</th>
+                  <th style="padding:12px 16px;">Description &amp; Ref</th>
+                  <th style="padding:12px 16px;">Type / Channel</th>
+                  <th style="padding:12px 16px;">Source</th>
+                  <th style="padding:12px 16px;">Status</th>
+                  <th style="padding:12px 16px; text-align:right;">Amount</th>
+                  <th style="padding:12px 16px; text-align:center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-transactions-tbody">
+                <!-- Injected by js/admin.js -->
+              </tbody>
+            </table>
+          </div>
+
+        </section>
+        <!-- /PAGE: ADMIN CONSOLE -->
+
+
       </main>
       <!-- /PAGE CONTENT -->
 
@@ -1736,6 +1828,80 @@
   </div>
   <!-- /CONNECT ACCOUNT DEMO MODAL -->
 
+  <!-- ============================================================
+     ADMIN MODAL: ADD / EDIT TRANSACTION
+     ============================================================ -->
+  <div class="modal-overlay" id="admin-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="admin-modal-title">Edit Transaction (Admin)</h2>
+        <button class="modal-close" id="admin-modal-close" aria-label="Close modal">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
+        <input type="hidden" id="admin-edit-id">
+        <div class="form-group">
+          <label class="form-label" for="admin-field-desc">Description</label>
+          <input type="text" id="admin-field-desc" class="form-input" placeholder="e.g. Counter Cash Sale">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label" for="admin-field-amount">Amount (&#8377;)</label>
+            <input type="number" id="admin-field-amount" class="form-input" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-field-type">Type</label>
+            <select id="admin-field-type" class="form-input">
+              <option value="sale">Sale</option>
+              <option value="expense">Expense</option>
+              <option value="withdrawal">Withdrawal</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label" for="admin-field-method">Payment Method</label>
+            <select id="admin-field-method" class="form-input">
+              <option value="cash">Cash</option>
+              <option value="upi">UPI</option>
+              <option value="card">Card</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="credit">Credit / Khata</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-field-settlement">Settlement Status</label>
+            <select id="admin-field-settlement" class="form-input">
+              <option value="settled">Settled</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label" for="admin-field-source">Source</label>
+            <select id="admin-field-source" class="form-input">
+              <option value="manual">Manual</option>
+              <option value="auto">Auto (Digital Feed)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-field-date">Transaction Date</label>
+            <input type="date" id="admin-field-date" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-field-channel">Channel Label</label>
+          <input type="text" id="admin-field-channel" class="form-input" placeholder="e.g. Counter Cash, UPI • PhonePe QR">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+          <button type="button" class="btn btn-secondary" id="btn-admin-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-admin-save">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ============================================================
      SCRIPTS
@@ -1754,6 +1920,7 @@
   <script src="js/connectaccount.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/advisor.js"></script>
+  <script src="js/admin.js"></script>
 
   <!-- Init toggle switch thumbs (ensure thumb element exists in all toggles) -->
   <script>

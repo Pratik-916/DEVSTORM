@@ -207,11 +207,36 @@ const SupabaseService = (() => {
     }
   }
 
+  /**
+   * Delete a transaction from Supabase by id
+   */
+  async function deleteTransaction(id) {
+    if (!isConnected()) return false;
+
+    try {
+      const { error } = await _client
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.warn('[Cashly] Notice deleting transaction:', error.message || error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice deleting transaction:', err.message || err);
+      return false;
+    }
+  }
+
   return {
     init,
     isConnected,
     fetchTransactions,
     insertTransaction,
     insertTransactions,
+    deleteTransaction,
   };
 })();
