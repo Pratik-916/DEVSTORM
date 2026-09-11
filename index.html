@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cashly — Know your cash. Make smarter moves. Financial clarity for small vendors and micro-businesses." />
+  <meta name="theme-color" content="#16A34A" />
+  <title>Cashly — Know your cash. Make smarter moves.</title>
+
+  <!-- Design Tokens first, then cascade -->
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/pages.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ============================================================
+     APP SHELL
+     ============================================================ -->
+<div class="app-shell">
+
+  <!-- ============================================================
+       DESKTOP SIDEBAR
+       ============================================================ -->
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon" aria-hidden="true">
+        <!-- Leaf / brand icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/>
+          <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+        </svg>
+      </div>
+      <span class="sidebar-logo-text">Cashly</span>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sidebar-nav" aria-label="Pages">
+      <p class="sidebar-nav-label">Menu</p>
+
+      <button class="sidebar-nav-item active" data-page="dashboard" aria-label="Dashboard">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        <span>Dashboard</span>
+      </button>
+
+      <button class="sidebar-nav-item" data-page="transactions" aria-label="Transactions">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 6H3"/><path d="M10 12H3"/><path d="M10 18H3"/><path d="m16 12 2 2 4-4"/></svg>
+        <span>Transactions</span>
+      </button>
+
+      <button class="sidebar-nav-item" data-page="payments" aria-label="Payments">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+        <span>Payments</span>
+      </button>
+
+      <button class="sidebar-nav-item" data-page="reports" aria-label="Reports">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+        <span>Reports</span>
+      </button>
+
+      <button class="sidebar-nav-item" data-page="insights" aria-label="Insights">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a8 8 0 0 1 8 8c0 3.7-2.5 6.9-6 7.7V20h-4v-2.3C6.5 16.9 4 13.7 4 10a8 8 0 0 1 8-8z"/><path d="M9 21h6"/></svg>
+        <span>Insights</span>
+      </button>
+
+      <div class="divider"></div>
+
+      <button class="sidebar-nav-item" data-page="settings" aria-label="Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <p class="sidebar-footer-text">Cashly v1.0 &bull; Demo Mode</p>
+    </div>
+  </aside>
+
+  <!-- ============================================================
+       MAIN CONTENT
+       ============================================================ -->
+  <div class="main-content">
+
+    <!-- ============================================================
+         DESKTOP HEADER
+         ============================================================ -->
+    <header class="header" id="header">
+
+      <!-- Search -->
+      <div class="header-search" role="search">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="search" id="header-search-input" placeholder="Search transactions, payments..." aria-label="Search transactions and payments" />
+      </div>
+
+      <!-- Right actions -->
+      <div class="header-actions">
+
+        <!-- Add button -->
+        <button class="btn btn-primary btn-sm" id="btn-header-add" aria-label="Add transaction">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+          Add
+        </button>
+
+        <!-- Notifications -->
+        <div class="dropdown">
+          <button class="icon-btn dropdown-toggle" id="btn-notifications" aria-label="Notifications" aria-haspopup="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="notif-dot" aria-label="3 unread notifications"></span>
+          </button>
+          <div class="dropdown-menu notif-dropdown" role="menu" aria-label="Notifications">
+            <div class="notif-header">
+              <span>Notifications</span>
+              <button class="btn btn-ghost btn-sm" style="font-size:11px; padding:4px 8px;">Mark all read</button>
+            </div>
+            <div class="divider" style="margin:4px 0;"></div>
+            <div class="notif-item" role="menuitem">
+              <div class="notif-item-title">Supplier Payment Due Tomorrow</div>
+              <div class="notif-item-body">₹3,000 due to supplier. Ensure funds are available.</div>
+              <div class="notif-item-time">2 hours ago</div>
+            </div>
+            <div class="notif-item" role="menuitem">
+              <div class="notif-item-title">Pending Settlement Update</div>
+              <div class="notif-item-body">₹7,800 from UPI / Cards is still pending.</div>
+              <div class="notif-item-time">Yesterday</div>
+            </div>
+            <div class="notif-item" role="menuitem">
+              <div class="notif-item-title">Cash Position Alert</div>
+              <div class="notif-item-body">Your available cash is approaching upcoming obligations.</div>
+              <div class="notif-item-time">2 days ago</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Business selector -->
+        <div class="dropdown">
+          <div class="business-selector dropdown-toggle" id="btn-business" role="button" aria-label="Demo Shop — Food &amp; General Store" aria-haspopup="true" tabindex="0">
+            <div class="business-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a3 3 0 0 0-6 0v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>
+            </div>
+            <div class="business-info">
+              <span class="business-name">Demo Shop</span>
+              <span class="business-type">Food &amp; General Store</span>
+            </div>
+            <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="dropdown-menu" role="menu">
+            <button class="dropdown-item" role="menuitem">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a3 3 0 0 0-6 0v4"/><path d="M2 7h20"/></svg>
+              Demo Shop
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" role="menuitem">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+              Add Business
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- ============================================================
+         MOBILE HEADER
+         ============================================================ -->
+    <header class="mobile-header" id="mobile-header">
+      <div class="mobile-header-top">
+        <div class="mobile-logo">
+          <div class="mobile-logo-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+          </div>
+          <span class="mobile-logo-text">Cashly</span>
+        </div>
+        <div class="mobile-header-actions">
+          <button class="icon-btn" id="btn-mobile-notifications" aria-label="Notifications" style="position:relative;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="notif-dot" aria-label="3 unread notifications"></span>
+          </button>
+        </div>
+      </div>
+      <div class="mobile-business-row">
+        <div class="mobile-business-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M2 7h20"/></svg>
+        </div>
+        <span class="mobile-business-name">Demo Shop</span>
+        <span class="mobile-business-type">Food &amp; General Store</span>
+      </div>
+    </header>
+
+    <!-- ============================================================
+         PAGE CONTENT
+         ============================================================ -->
+    <main class="page-content" id="page-content">
+
+
+      <!-- ================================================
+           PAGE: DASHBOARD
+           ================================================ -->
+      <section class="page active" id="page-dashboard" data-page="dashboard" aria-label="Dashboard">
+
+        <!-- Greeting -->
+        <div class="page-greeting">
+          <div>
+            <h1 class="greeting-title">Good morning,</h1>
+            <p class="greeting-subtitle">Here's your cash position for today.</p>
+          </div>
+          <p class="page-date">Thu, 26 Nov 2024</p>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-cards" role="list" aria-label="Financial summary">
+
+          <!-- Total Sales -->
+          <div class="summary-card" role="listitem">
+            <div class="summary-card-header">
+              <span class="summary-card-label">Total Sales</span>
+              <div class="summary-card-icon icon-green" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              </div>
+            </div>
+            <div class="summary-card-value" id="metric-total-sales">&#8377;20,450</div>
+            <div class="summary-card-trend trend-up">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
+              <span>12% from last week</span>
+            </div>
+          </div>
+
+          <!-- Available Cash — highlighted -->
+          <div class="summary-card card-highlight" role="listitem">
+            <div class="summary-card-header">
+              <span class="summary-card-label">Available Cash</span>
+              <div class="summary-card-icon icon-green" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+              </div>
+            </div>
+            <div class="summary-card-value" id="metric-available-cash">&#8377;8,250</div>
+            <div class="summary-card-trend trend-neutral">
+              <span style="color:var(--c-primary-hover); font-size:var(--text-xs);">Usable right now</span>
+            </div>
+          </div>
+
+          <!-- Pending Settlement -->
+          <div class="summary-card" role="listitem">
+            <div class="summary-card-header">
+              <span class="summary-card-label">Pending Settlement</span>
+              <div class="summary-card-icon icon-amber" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+            </div>
+            <div class="summary-card-value" id="metric-pending-settlement">&#8377;7,800</div>
+            <div class="summary-card-trend trend-neutral">
+              <span style="font-size:var(--text-xs); color:var(--c-text-muted);">From UPI / Cards / Credit</span>
+            </div>
+          </div>
+
+          <!-- Total Expenses -->
+          <div class="summary-card" role="listitem">
+            <div class="summary-card-header">
+              <span class="summary-card-label">Total Expenses</span>
+              <div class="summary-card-icon icon-red" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+              </div>
+            </div>
+            <div class="summary-card-value" id="metric-total-expenses">&#8377;5,200</div>
+            <div class="summary-card-trend trend-neutral">
+              <span style="font-size:var(--text-xs); color:var(--c-text-muted);">This month</span>
+            </div>
+          </div>
+
+        </div>
+        <!-- /Summary Cards -->
+
+        <!-- Main 3-column grid -->
+        <div class="dashboard-main-grid">
+
+          <!-- Cash Position Card -->
+          <div class="cash-position-card card">
+            <div class="cash-position-header">
+              <span class="cash-position-title">Cash Position</span>
+              <div class="live-badge" aria-label="Live view">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span>Live</span>
+              </div>
+            </div>
+
+            <div class="cash-position-main">
+              <p class="cash-pos-label">Available Cash</p>
+              <div class="cash-pos-amount" id="metric-cash-pos-amount">&#8377;8,250</div>
+              <div class="cash-pos-status">
+                <span id="cash-health-badge" class="badge badge-caution" aria-label="Cash health: Caution">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                  Caution
+                </span>
+              </div>
+              <p class="cash-pos-message" id="cash-pos-message">Your upcoming payments are getting close to your available cash.</p>
+            </div>
+
+            <!-- Safe to Spend -->
+            <div class="safe-to-spend" tabindex="0" aria-label="Safe to spend: ₹3,250">
+              <div class="safe-to-spend-left">
+                <p class="safe-to-spend-label">Safe to Spend</p>
+                <p class="safe-to-spend-amount" id="metric-safe-to-spend">&#8377;3,250</p>
+              </div>
+              <div class="safe-to-spend-right" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7-Day Cash Forecast -->
+          <div class="forecast-card card">
+            <div class="section-header">
+              <div>
+                <p class="section-title">7-Day Cash Forecast</p>
+                <p class="section-subtitle">Expected available cash</p>
+              </div>
+            </div>
+            <div class="forecast-chart-wrap">
+              <canvas id="forecast-chart" aria-label="7-day cash forecast chart" role="img"></canvas>
+            </div>
+            <div class="forecast-note" aria-live="polite">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+              Lowest expected cash: <strong>&#8377;4,200 on Friday</strong>
+            </div>
+          </div>
+
+          <!-- Upcoming Payments -->
+          <div class="upcoming-card card">
+            <div class="section-header">
+              <p class="section-title">Upcoming Payments</p>
+              <button class="section-link" id="btn-view-all-payments" aria-label="View all upcoming payments">
+                View all
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </button>
+            </div>
+
+            <ul aria-label="Upcoming payments list">
+              <!-- Supplier Payment -->
+              <li class="payment-item">
+                <div class="payment-icon pi-essential" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                </div>
+                <div class="payment-info">
+                  <p class="payment-name">Supplier Payment</p>
+                  <p class="payment-due">Tomorrow</p>
+                </div>
+                <div class="payment-right">
+                  <span class="payment-amount">&#8377;3,000</span>
+                  <span class="badge badge-essential">Essential</span>
+                </div>
+              </li>
+
+              <!-- Rent -->
+              <li class="payment-item">
+                <div class="payment-icon pi-essential" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <div class="payment-info">
+                  <p class="payment-name">Rent</p>
+                  <p class="payment-due">In 3 days</p>
+                </div>
+                <div class="payment-right">
+                  <span class="payment-amount">&#8377;5,000</span>
+                  <span class="badge badge-essential">Essential</span>
+                </div>
+              </li>
+
+              <!-- Wages -->
+              <li class="payment-item">
+                <div class="payment-icon pi-high" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div class="payment-info">
+                  <p class="payment-name">Wages</p>
+                  <p class="payment-due">In 5 days</p>
+                </div>
+                <div class="payment-right">
+                  <span class="payment-amount">&#8377;2,500</span>
+                  <span class="badge badge-high">High</span>
+                </div>
+              </li>
+
+              <!-- Utilities -->
+              <li class="payment-item">
+                <div class="payment-icon pi-medium" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <div class="payment-info">
+                  <p class="payment-name">Utilities</p>
+                  <p class="payment-due">In 6 days</p>
+                </div>
+                <div class="payment-right">
+                  <span class="payment-amount">&#8377;1,200</span>
+                  <span class="badge badge-medium">Medium</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <!-- /Upcoming Payments -->
+
+        </div>
+        <!-- /Main Grid -->
+
+        <!-- Cashly Advisor -->
+        <div class="advisor-section card">
+          <div class="advisor-icon-wrap" aria-hidden="true">
+            <!-- Spark / insight SVG (not a robot) -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+              <path d="M20 3v4"/>
+              <path d="M22 5h-4"/>
+            </svg>
+          </div>
+          <div class="advisor-content">
+            <p class="advisor-label">Cashly Advisor</p>
+            <p class="advisor-title">Cash position looks stable — here's what to watch.</p>
+            <p class="advisor-message">Your cash looks stable, but &#8377;7,800 of your sales are still pending settlement. Consider avoiding non-essential expenses until your pending funds arrive.</p>
+          </div>
+          <div class="advisor-actions">
+            <button class="btn btn-primary" id="btn-view-insights" aria-label="View detailed cash insights">
+              View Insights
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+
+      </section>
+      <!-- /PAGE: DASHBOARD -->
+
+
+      <!-- ================================================
+           PAGE: TRANSACTIONS
+           ================================================ -->
+      <section class="page" id="page-transactions" data-page="transactions" aria-label="Transactions">
+
+        <div class="page-header-row">
+          <h1 class="page-header-title">Transactions</h1>
+          <p class="page-header-subtitle">Your sales, expenses, and pending activity.</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="transactions-filter-row" role="tablist" aria-label="Transaction filters">
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all" role="tab" aria-selected="true">All</button>
+            <button class="filter-tab" data-filter="sale" role="tab" aria-selected="false">Sales</button>
+            <button class="filter-tab" data-filter="expense" role="tab" aria-selected="false">Expenses</button>
+            <button class="filter-tab" data-filter="pending" role="tab" aria-selected="false">Pending</button>
+          </div>
+        </div>
+
+        <!-- Transaction list — rendered by js/transactions.js from AppState -->
+        <div class="card card-pad transactions-page-layout" role="feed" aria-label="Transaction history">
+          <div id="transaction-list-container">
+            <!-- JS will render transaction items here from AppState -->
+          </div>
+        </div>
+
+      </section>
+      <!-- /PAGE: TRANSACTIONS -->
+
+
+      <!-- ================================================
+           PAGE: PAYMENTS
+           ================================================ -->
+      <section class="page" id="page-payments" data-page="payments" aria-label="Upcoming Payments">
+
+        <div class="page-header-row" style="display:flex;align-items:flex-start;justify-content:space-between;">
+          <div>
+            <h1 class="page-header-title">Upcoming Payments</h1>
+            <p class="page-header-subtitle">Payments due in the next 7 days.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-header-add-payment" aria-label="Add upcoming payment"
+            onclick="AddTransaction.open()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+            Add
+          </button>
+        </div>
+
+        <!-- Summary Banner -->
+        <div class="payments-summary-banner" role="status" aria-label="Total due: ₹11,700 in the next 7 days">
+          <p class="payments-summary-amount">&#8377;11,700</p>
+          <p class="payments-summary-label">Due in the next 7 days</p>
+        </div>
+
+        <!-- Group: Tomorrow -->
+        <div class="payment-group">
+          <p class="payment-group-header">Tomorrow <span class="payment-group-count">(1)</span></p>
+
+          <div class="payment-row">
+            <div class="payment-row-icon" style="background:var(--c-danger-light);color:var(--c-danger);" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+            </div>
+            <div class="payment-row-info">
+              <p class="payment-row-name">Supplier Payment</p>
+              <p class="payment-row-amount">Due: Tomorrow, 27 Nov</p>
+            </div>
+            <div class="payment-row-right">
+              <span class="payment-row-value">&#8377;3,000</span>
+              <span class="badge badge-essential">Essential</span>
+            </div>
+            <div class="payment-row-chevron" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group: In 3 days -->
+        <div class="payment-group">
+          <p class="payment-group-header">In 3 days <span class="payment-group-count">(1)</span></p>
+
+          <div class="payment-row">
+            <div class="payment-row-icon" style="background:var(--c-danger-light);color:var(--c-danger);" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div class="payment-row-info">
+              <p class="payment-row-name">Rent</p>
+              <p class="payment-row-amount">Due: 29 Nov</p>
+            </div>
+            <div class="payment-row-right">
+              <span class="payment-row-value">&#8377;5,000</span>
+              <span class="badge badge-essential">Essential</span>
+            </div>
+            <div class="payment-row-chevron" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group: In 5 days -->
+        <div class="payment-group">
+          <p class="payment-group-header">In 5 days <span class="payment-group-count">(1)</span></p>
+
+          <div class="payment-row">
+            <div class="payment-row-icon" style="background:var(--c-warning-light);color:var(--c-warning);" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="payment-row-info">
+              <p class="payment-row-name">Wages</p>
+              <p class="payment-row-amount">Due: 1 Dec</p>
+            </div>
+            <div class="payment-row-right">
+              <span class="payment-row-value">&#8377;2,500</span>
+              <span class="badge badge-high">High</span>
+            </div>
+            <div class="payment-row-chevron" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group: In 6 days -->
+        <div class="payment-group">
+          <p class="payment-group-header">In 6 days <span class="payment-group-count">(1)</span></p>
+
+          <div class="payment-row">
+            <div class="payment-row-icon" style="background:var(--c-info-light);color:var(--c-info);" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            <div class="payment-row-info">
+              <p class="payment-row-name">Utilities</p>
+              <p class="payment-row-amount">Due: 2 Dec</p>
+            </div>
+            <div class="payment-row-right">
+              <span class="payment-row-value">&#8377;1,200</span>
+              <span class="badge badge-medium">Medium</span>
+            </div>
+            <div class="payment-row-chevron" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+      </section>
+      <!-- /PAGE: PAYMENTS -->
+
+
+      <!-- ================================================
+           PAGE: REPORTS
+           ================================================ -->
+      <section class="page" id="page-reports" data-page="reports" aria-label="Reports">
+
+        <div class="page-header-row">
+          <h1 class="page-header-title">Reports</h1>
+          <p class="page-header-subtitle">A snapshot of your business finances this month.</p>
+        </div>
+
+        <!-- Metric cards -->
+        <div class="reports-summary-grid" role="list" aria-label="Financial metrics">
+          <div class="report-metric-card" role="listitem">
+            <p class="report-metric-label">Total Sales</p>
+            <p class="report-metric-value value-green" id="report-total-sales">&#8377;20,450</p>
+          </div>
+          <div class="report-metric-card" role="listitem">
+            <p class="report-metric-label">Total Expenses</p>
+            <p class="report-metric-value value-red" id="report-total-expenses">&#8377;5,200</p>
+          </div>
+          <div class="report-metric-card" role="listitem">
+            <p class="report-metric-label">Available Cash</p>
+            <p class="report-metric-value" id="report-available-cash">&#8377;8,250</p>
+          </div>
+          <div class="report-metric-card" role="listitem">
+            <p class="report-metric-label">Pending Money</p>
+            <p class="report-metric-value value-amber" id="report-pending-money">&#8377;7,800</p>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="reports-chart-card">
+          <div class="section-header" style="margin-bottom:0;">
+            <div>
+              <p class="section-title">Financial Overview</p>
+              <p class="section-subtitle">November 2024</p>
+            </div>
+          </div>
+          <div class="reports-chart-wrap">
+            <canvas id="reports-chart" aria-label="Financial overview bar chart" role="img"></canvas>
+          </div>
+        </div>
+
+        <!-- Summary note -->
+        <div class="card card-pad" style="margin-top:var(--sp-4);">
+          <p class="section-title" style="margin-bottom:var(--sp-3);">This Month at a Glance</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);">
+            <div>
+              <p style="font-size:var(--text-sm);color:var(--c-text-secondary);margin-bottom:4px;">Net Position</p>
+              <p style="font-size:var(--text-lg);font-weight:var(--fw-bold);color:var(--c-primary);" id="report-net-position">&#8377;15,250</p>
+              <p style="font-size:var(--text-xs);color:var(--c-text-muted);margin-top:2px;">Sales minus Expenses</p>
+            </div>
+            <div>
+              <p style="font-size:var(--text-sm);color:var(--c-text-secondary);margin-bottom:4px;">Cash Conversion</p>
+              <p style="font-size:var(--text-lg);font-weight:var(--fw-bold);color:var(--c-text-primary);" id="report-cash-conversion">51%</p>
+              <p style="font-size:var(--text-xs);color:var(--c-text-muted);margin-top:2px;">Sales converted to available cash</p>
+            </div>
+          </div>
+        </div>
+
+      </section>
+      <!-- /PAGE: REPORTS -->
+
+
+      <!-- ================================================
+           PAGE: INSIGHTS
+           ================================================ -->
+      <section class="page" id="page-insights" data-page="insights" aria-label="Insights">
+
+        <div class="page-header-row">
+          <h1 class="page-header-title">Insights</h1>
+          <p class="page-header-subtitle">Smart observations about your cash and business health.</p>
+        </div>
+
+        <!-- Key metrics grid -->
+        <div class="insight-grid" role="list" aria-label="Key financial metrics">
+          <div class="insight-card" role="listitem">
+            <p class="insight-card-label">Cash Health</p>
+            <p class="insight-card-value" style="font-size:var(--text-xl);">Caution</p>
+            <span class="badge badge-caution">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              Watch closely
+            </span>
+          </div>
+          <div class="insight-card" role="listitem">
+            <p class="insight-card-label">Pending Settlements</p>
+            <p class="insight-card-value">&#8377;7,800</p>
+            <span class="badge badge-pending">UPI + Cards</span>
+          </div>
+          <div class="insight-card" role="listitem">
+            <p class="insight-card-label">Upcoming Obligations</p>
+            <p class="insight-card-value">&#8377;11,700</p>
+            <span class="badge badge-high">7 days</span>
+          </div>
+          <div class="insight-card" role="listitem">
+            <p class="insight-card-label">Safe to Spend</p>
+            <p class="insight-card-value" style="color:var(--c-primary);">&#8377;3,250</p>
+            <span class="badge badge-healthy">After obligations</span>
+          </div>
+        </div>
+
+        <!-- Insight cards -->
+        <h2 style="font-size:var(--text-md);font-weight:var(--fw-semibold);color:var(--c-text-primary);margin-bottom:var(--sp-3);">Observations</h2>
+
+        <div class="insight-alert-card insight-caution" role="alert">
+          <div class="insight-alert-icon icon-caution" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          </div>
+          <div class="insight-alert-content">
+            <p class="insight-alert-title">Upcoming payments close to available cash</p>
+            <p class="insight-alert-body">You have &#8377;11,700 in payments due over the next 7 days, while your available cash is &#8377;8,250. Your pending settlement of &#8377;7,800 may need to arrive before some of these payments are due.</p>
+          </div>
+        </div>
+
+        <div class="insight-alert-card insight-caution">
+          <div class="insight-alert-icon icon-caution" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="insight-alert-content">
+            <p class="insight-alert-title">&#8377;7,800 still pending settlement</p>
+            <p class="insight-alert-body">A significant portion of your recent sales have not yet settled. UPI and card payments typically settle in 1–2 business days. Monitor this closely to ensure funds arrive before your supplier payment tomorrow.</p>
+          </div>
+        </div>
+
+        <div class="insight-alert-card insight-healthy">
+          <div class="insight-alert-icon icon-healthy" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          </div>
+          <div class="insight-alert-content">
+            <p class="insight-alert-title">Sales trending up 12% this week</p>
+            <p class="insight-alert-body">Your total sales of &#8377;20,450 this month represent a 12% increase from last week. If this trend continues, your cash position should improve after settlements arrive.</p>
+          </div>
+        </div>
+
+        <div class="insight-alert-card insight-healthy">
+          <div class="insight-alert-icon icon-healthy" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="insight-alert-content">
+            <p class="insight-alert-title">Expenses are under control</p>
+            <p class="insight-alert-body">Your expenses of &#8377;5,200 represent about 25% of your total sales — a healthy ratio for a small retail business. Continue monitoring non-essential expenses during the current period.</p>
+          </div>
+        </div>
+
+      </section>
+      <!-- /PAGE: INSIGHTS -->
+
+
+      <!-- ================================================
+           PAGE: SETTINGS
+           ================================================ -->
+      <section class="page" id="page-settings" data-page="settings" aria-label="Settings">
+
+        <div class="page-header-row">
+          <h1 class="page-header-title">Settings</h1>
+          <p class="page-header-subtitle">Manage your business profile and preferences.</p>
+        </div>
+
+        <!-- Business Profile -->
+        <div class="settings-group">
+          <p class="settings-group-label">Business Profile</p>
+
+          <div class="settings-row" tabindex="0" aria-label="Business name: Demo Shop">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a3 3 0 0 0-6 0v4"/><path d="M2 7h20"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Business Name</p>
+                <p class="settings-row-desc">Your registered business name</p>
+              </div>
+            </div>
+            <div class="settings-row-right">
+              <span class="settings-row-value">Demo Shop</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+
+          <div class="settings-row" tabindex="0" aria-label="Business type: Food & General Store">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Business Type</p>
+                <p class="settings-row-desc">Category of your business</p>
+              </div>
+            </div>
+            <div class="settings-row-right">
+              <span class="settings-row-value">Food &amp; General Store</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+
+          <div class="settings-row" tabindex="0" aria-label="Currency: INR (Indian Rupee)">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Currency</p>
+                <p class="settings-row-desc">Default display currency</p>
+              </div>
+            </div>
+            <div class="settings-row-right">
+              <span class="settings-row-value">INR (&#8377;)</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="settings-group">
+          <p class="settings-group-label">Notifications</p>
+
+          <div class="settings-row" tabindex="0" aria-label="Payment reminders toggle">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Payment Reminders</p>
+                <p class="settings-row-desc">Alerts before upcoming payments are due</p>
+              </div>
+            </div>
+            <div class="settings-row-right">
+              <div class="toggle-switch on" role="switch" aria-checked="true" aria-label="Payment reminders enabled" tabindex="0"></div>
+            </div>
+          </div>
+
+          <div class="settings-row" tabindex="0" aria-label="Cash health alerts toggle">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Cash Health Alerts</p>
+                <p class="settings-row-desc">Notified when cash health changes</p>
+              </div>
+            </div>
+            <div class="settings-row-right">
+              <div class="toggle-switch on" role="switch" aria-checked="true" aria-label="Cash health alerts enabled" tabindex="0"></div>
+            </div>
+          </div>
+
+          <div class="settings-row" tabindex="0" aria-label="Settlement updates toggle">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Settlement Updates</p>
+                <p class="settings-row-desc">When pending amounts are cleared</p>
+              </div>
+            </div>
+            <div class="settings-row-right">
+              <div class="toggle-switch" role="switch" aria-checked="false" aria-label="Settlement updates disabled" tabindex="0">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="settings-group">
+          <p class="settings-group-label">Appearance</p>
+
+          <div class="settings-row" tabindex="0" aria-label="Theme setting">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Theme</p>
+                <p class="settings-row-desc">Display appearance</p>
+              </div>
+            </div>
+            <div class="settings-row-right">
+              <span class="settings-row-value">Light</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- About -->
+        <div class="settings-group">
+          <p class="settings-group-label">About</p>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              </div>
+              <div>
+                <p class="settings-row-label">Version</p>
+                <p class="settings-row-desc">Cashly Demo v1.0</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+      <!-- /PAGE: SETTINGS -->
+
+
+    </main>
+    <!-- /PAGE CONTENT -->
+
+  </div>
+  <!-- /MAIN CONTENT -->
+
+</div>
+<!-- /APP SHELL -->
+
+
+<!-- ============================================================
+     MOBILE BOTTOM NAVIGATION
+     ============================================================ -->
+<nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+
+  <button class="mobile-nav-item active" data-page="dashboard" aria-label="Dashboard" aria-pressed="true">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+    <span class="mobile-nav-label">Home</span>
+  </button>
+
+  <button class="mobile-nav-item" data-page="transactions" aria-label="Activity and transactions" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 6H3"/><path d="M10 12H3"/><path d="M10 18H3"/><path d="m16 12 2 2 4-4"/></svg>
+    <span class="mobile-nav-label">Activity</span>
+  </button>
+
+  <!-- Add button (centered) -->
+  <button class="mobile-nav-add" id="btn-mobile-add" aria-label="Add transaction">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+  </button>
+
+  <button class="mobile-nav-item" data-page="payments" aria-label="Payments" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+    <span class="mobile-nav-label">Payments</span>
+  </button>
+
+  <button class="mobile-nav-item" data-page="settings" aria-label="More options and settings" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+    <span class="mobile-nav-label">More</span>
+  </button>
+
+</nav>
+
+
+<!-- ============================================================
+     ADD TRANSACTION MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-type-heading">
+
+  <div class="modal">
+
+    <!-- ---- SCREEN 1: Type Selector ---- -->
+    <div id="modal-type-screen">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-type-heading">What do you want to add?</h2>
+        <button class="modal-close" id="modal-type-close" aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:var(--text-sm);color:var(--c-text-secondary);margin-bottom:var(--sp-5);">Keep track of your business easily.</p>
+
+        <!-- Sale -->
+        <button class="add-type-option" id="add-type-sale" aria-label="Record a sale">
+          <div class="add-type-icon ti-sale" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          </div>
+          <div class="add-type-text">
+            <p class="add-type-label">Record a Sale</p>
+            <p class="add-type-desc">Money coming in</p>
+          </div>
+          <div class="add-type-arrow" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </button>
+
+        <!-- Expense -->
+        <button class="add-type-option" id="add-type-expense" aria-label="Record an expense">
+          <div class="add-type-icon ti-expense" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+          </div>
+          <div class="add-type-text">
+            <p class="add-type-label">Record an Expense</p>
+            <p class="add-type-desc">Money going out</p>
+          </div>
+          <div class="add-type-arrow" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </button>
+
+        <!-- Upcoming Payment -->
+        <button class="add-type-option" id="add-type-payment" aria-label="Add upcoming payment">
+          <div class="add-type-icon ti-payment" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+          </div>
+          <div class="add-type-text">
+            <p class="add-type-label">Add Upcoming Payment</p>
+            <p class="add-type-desc">Future obligation</p>
+          </div>
+          <div class="add-type-arrow" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </button>
+      </div>
+    </div>
+    <!-- /Screen 1 -->
+
+
+    <!-- ---- SCREEN 2: Transaction Form ---- -->
+    <div id="modal-form-screen" class="hidden">
+      <div class="modal-header">
+        <button class="modal-close" id="modal-form-back" aria-label="Go back" style="margin-right:var(--sp-2);">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h2 class="modal-title" id="modal-form-title" style="flex:1;">Add Transaction</h2>
+        <button class="modal-close" id="modal-form-close" aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Type toggle -->
+        <div class="form-group">
+          <label class="form-label">Transaction Type</label>
+          <div class="type-toggle">
+            <button class="type-option sale-option selected" id="type-toggle-sale" aria-pressed="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              Sale
+            </button>
+            <button class="type-option expense-option" id="type-toggle-expense" aria-pressed="false">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+              Expense
+            </button>
+          </div>
+        </div>
+
+        <!-- Amount -->
+        <div class="form-group">
+          <label class="form-label" for="txn-amount">Amount</label>
+          <div class="amount-field">
+            <span class="amount-prefix" aria-hidden="true">&#8377;</span>
+            <input class="form-control amount-input" type="number" id="txn-amount" placeholder="0" min="0" step="1" aria-label="Transaction amount in rupees" />
+          </div>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="form-group">
+          <label class="form-label">Payment Method</label>
+          <div class="method-grid" role="radiogroup" aria-label="Payment method">
+            <button class="method-btn selected" role="radio" aria-checked="true" aria-label="Cash">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+              Cash
+            </button>
+            <button class="method-btn" role="radio" aria-checked="false" aria-label="UPI">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              UPI
+            </button>
+            <button class="method-btn" role="radio" aria-checked="false" aria-label="Card">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+              Card
+            </button>
+            <button class="method-btn" role="radio" aria-checked="false" aria-label="Bank Transfer">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
+              Bank
+            </button>
+            <button class="method-btn" role="radio" aria-checked="false" aria-label="Credit">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Credit
+            </button>
+          </div>
+        </div>
+
+        <!-- Settlement Status -->
+        <div class="form-group">
+          <label class="form-label">Settlement Status</label>
+          <div class="settle-toggle" role="radiogroup" aria-label="Settlement status">
+            <button class="settle-option selected-settled" id="settle-settled" role="radio" aria-checked="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Settled
+            </button>
+            <button class="settle-option" id="settle-pending" role="radio" aria-checked="false">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Pending
+            </button>
+          </div>
+        </div>
+
+        <!-- Category -->
+        <div class="form-group">
+          <label class="form-label" for="txn-category">Category</label>
+          <select class="form-control" id="txn-category" aria-label="Transaction category">
+            <option value="">Select category</option>
+            <option value="sales">Sales</option>
+            <option value="stock">Stock / Inventory</option>
+            <option value="rent">Rent</option>
+            <option value="wages">Wages</option>
+            <option value="utilities">Utilities</option>
+            <option value="supplier">Supplier</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="txn-description">Description (optional)</label>
+          <input class="form-control" type="text" id="txn-description" placeholder="e.g. Customer name, notes..." aria-label="Transaction description" />
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-lg btn-full" id="btn-add-transaction-submit">
+          Add Transaction
+        </button>
+      </div>
+    </div>
+    <!-- /Screen 2 -->
+
+  </div>
+</div>
+<!-- /ADD TRANSACTION MODAL -->
+
+
+<!-- ============================================================
+     SCRIPTS
+     ============================================================ -->
+<!-- data.js MUST load first — it defines AppState used by all other modules -->
+<script src="js/data.js"></script>
+<script src="js/router.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/transactions.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/addtransaction.js"></script>
+<script src="js/settings.js"></script>
+
+<!-- Init toggle switch thumbs (ensure thumb element exists in all toggles) -->
+<script>
+  document.querySelectorAll('.toggle-switch').forEach(function(sw) {
+    if (!sw.querySelector('.toggle-switch-thumb')) {
+      var thumb = document.createElement('div');
+      thumb.className = 'toggle-switch-thumb';
+      sw.appendChild(thumb);
+    }
+  });
+</script>
+
+</body>
+</html>
