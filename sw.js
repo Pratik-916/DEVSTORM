@@ -6,7 +6,7 @@
  * ============================================================
  */
 
-const CACHE_NAME = 'cashly-cache-v3';
+const CACHE_NAME = 'cashly-cache-v4';
 
 const STATIC_ASSETS = [
   '/',
@@ -22,6 +22,7 @@ const STATIC_ASSETS = [
   '/js/data.js',
   '/js/patterns.js',
   '/js/cashflow.js',
+  '/js/scenarios.js',
   '/js/router.js',
   '/js/dashboard.js',
   '/js/transactions.js',

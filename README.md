@@ -327,7 +327,63 @@ To protect micro-merchants from unexpected spikes without generating false alarm
 
 ---
 
-## 9. Local Development Setup
+## 9. Cashflow Planner & What-If Scenarios (Phase 12)
+
+Cashly includes a deterministic, explainable scenario analysis layer (`js/scenarios.js` / `CashflowScenarioEngine`) that enables merchants to evaluate hypothetical financial decisions without risking real funds or modifying database records.
+
+> [!IMPORTANT]
+> **Scenario simulations are hypothetical and do not modify real transactions, balances or obligations.** All scenario calculations occur purely in-memory and never write to the database or alter confirmed Available Cash.
+
+### Supported Scenario Types
+
+1. **New Purchase ("What if I spend ₹X?")**:
+   - Evaluates whether an immediate discretionary or capital purchase is safe.
+   - Calculates hypothetical Available Cash (`Available Cash - Amount`) and hypothetical Safe to Spend (`Safe to Spend - Amount`).
+   - Assesses impact on projected ending cash and operational runway.
+
+2. **Affordability Check (`canAfford(amount)`)**:
+   - **Safe to Spend is the primary decision signal**, not merely Available Cash.
+   - Even if gross Available Cash covers a purchase, Cashly flags a **Caution** or **Risk** if spending would consume funds earmarked for scheduled obligations or deplete the 15% safety buffer.
+   - Deterministic risk levels:
+     - `Healthy`: Purchase is $\le \text{Safe to Spend}$ and retains $\ge \text{₹}3,000$ buffer.
+     - `Caution`: Purchase consumes most of Safe to Spend or dips into low-priority reserves while covering obligations.
+     - `Risk`: Purchase exceeds Safe to Spend to a degree that jeopardizes essential obligations, or exceeds total Available Cash creating an immediate cash deficit.
+
+3. **Sales Change Scenario (+20%, +10%, -10%, -20%, -30%)**:
+   - Simulates changes in organic daily revenue using `salesMultiplier`.
+   - Projects 7-day expected incoming cash, running daily balances, and ending liquidity.
+   - Confirmed liquid cash today remains factual and unmodified.
+
+4. **Expense Change Scenario (+20%, +10%, -10%, -20%)**:
+   - Simulates operational cost inflation or cost reduction using `expenseMultiplier`.
+   - Calculates impact on expected outgoing cash, daily cash burn, ending cash, and runway in days.
+
+5. **Delayed Settlement Scenario (1, 3, or 7 Days)**:
+   - Evaluates cashflow vulnerability to delayed digital payment settlements (UPI, Card, POS).
+   - Shifts projected T+1 and T+2 settlement arrivals forward by $N$ days without altering real `settlement_status`.
+   - Highlights liquidity troughs during the delay window to warn merchants against scheduling supplier payments before digital cash clears.
+
+6. **Upcoming Payment / Obligation Simulation**:
+   - Tests scheduling a future payment (e.g., ₹15,000 supplier invoice due in 5 days) without creating an actual database obligation.
+   - Immediately earmarks funds in Safe to Spend and charts the deduction on the scheduled date.
+
+### Explainability Structure
+Every scenario result generates a 5-part explainable breakdown:
+1. **Current Position**: Factual Available Cash, Safe to Spend, and scheduled commitments.
+2. **Hypothetical Change**: The exact simulated parameter applied.
+3. **Result**: Side-by-side metric comparison (Base vs. Scenario).
+4. **Why?**: Deterministic explanation referring to actual rupee amounts and ratios.
+5. **Recommendation**: Actionable guidance tailored to the resulting risk posture.
+
+### Data Isolation & Non-Destructive Guarantee
+- **Read-Only AppState**: Calculations pull current figures from `AppState.getSummary()` and `CashflowIntelligence.compute()`.
+- **Zero Database Operations**: No `INSERT`, `UPDATE`, or `DELETE` calls are executed against Supabase.
+- **Temporary State**: Scenario state is ephemeral; clicking **Reset / Clear** or reloading the page instantly restores base metrics.
+- **Advisor Synchronization**: `CashlyAdvisor` contextually reflects active scenario warnings and automatically returns to base behavior when cleared.
+
+---
+
+## 10. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -361,7 +417,7 @@ To protect micro-merchants from unexpected spikes without generating false alarm
 
 ---
 
-## 10. Deployment (Vercel / Netlify)
+## 11. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -373,14 +429,15 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 11. Current Limitations
+## 12. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
 3. **PWA Scope**: Service Worker pre-caches the complete application shell for offline browsing; transaction mutations require an active network connection to write to the cloud database.
+4. **Hypothetical Scenario Boundary**: Scenario simulations are local in-memory tools for vendor decision-support and do not automatically sync with external accounting software.
 
 ---
 
-## 12. License
+## 13. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

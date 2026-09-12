@@ -42,36 +42,70 @@ const CashflowIntelligence = (() => {
    * @returns {Object} intelligence result
    */
   function compute(opts = {}) {
-    if (typeof AppState === 'undefined') {
+    if (typeof AppState === 'undefined' && !opts.summaryOverride) {
       return _emptyResult();
     }
 
     const windowDays = opts.windowDays || 7;
-    const summary = AppState.getSummary();
-    const transactions = AppState.getTransactions();
-    const payments = AppState.getPayments().filter(p => p.status !== 'paid');
+    const summary = opts.summaryOverride || (typeof AppState !== 'undefined' ? AppState.getSummary() : {});
+    const transactions = opts.transactionsOverride || (typeof AppState !== 'undefined' ? AppState.getTransactions() : []);
+    const rawPayments = opts.paymentsOverride || (typeof AppState !== 'undefined' ? AppState.getPayments() : []);
+    const payments = rawPayments.filter(p => p.status !== 'paid');
 
     const {
-      availableCash,
-      pendingSettlement,
-      totalSales,
-      totalExpenses,
-      upcomingObligations,
-      settledSales,
+      availableCash = 0,
+      pendingSettlement = 0,
+      totalSales = 0,
+      totalExpenses = 0,
+      upcomingObligations = 0,
+      settledSales = 0,
     } = summary;
 
     const baseFloat = 800;
 
     /* ---- Historical Averages ---- */
-    const { avgDailyIncome, avgDailyExpenses, daysCovered } = _computeAverages(transactions);
+    let { avgDailyIncome, avgDailyExpenses, daysCovered } = _computeAverages(transactions);
 
-    /* ---- Settlement Cash Projection ---- */
+    /* ---- Phase 12: Sales Multiplier & Expense Multiplier Simulation ---- */
+    if (typeof opts.salesMultiplier === 'number') {
+      avgDailyIncome = Math.round(avgDailyIncome * opts.salesMultiplier);
+    }
+    if (typeof opts.expenseMultiplier === 'number') {
+      avgDailyExpenses = Math.round(avgDailyExpenses * opts.expenseMultiplier);
+    }
+
+    /* ---- Settlement Cash Projection & Phase 12 Delay Simulation ---- */
     // Pending settlements arrive T+1 (60%) and T+2 (40%)
+    const settlementDelayDays = Math.max(0, Number(opts.settlementDelayDays) || 0);
     const settlementT1 = Math.round(pendingSettlement * SETTLEMENT_T1_RATE);
     const settlementT2 = Math.round(pendingSettlement * SETTLEMENT_T2_RATE);
 
     /* ---- Obligation Schedule (map to day buckets) ---- */
     const obligationsByDay = _mapObligationsToDays(payments, windowDays);
+
+    /* ---- Phase 12: Additional Simulated Obligations ---- */
+    let additionalObligationsTotal = 0;
+    if (Array.isArray(opts.additionalObligations)) {
+      opts.additionalObligations.forEach(item => {
+        const amt = Number(item.amount) || 0;
+        if (amt > 0) {
+          additionalObligationsTotal += amt;
+          let dayIdx = Number(item.dayOffset);
+          if (isNaN(dayIdx) && item.dueDate) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dueMs = new Date(item.dueDate).setHours(0, 0, 0, 0);
+            dayIdx = Math.round((dueMs - today.getTime()) / 86400000);
+          }
+          if (isNaN(dayIdx)) {
+            dayIdx = 3;
+          }
+          if (dayIdx >= 0 && dayIdx < windowDays) {
+            obligationsByDay[dayIdx] = (obligationsByDay[dayIdx] || 0) + amt;
+          }
+        }
+      });
+    }
 
     /* ---- Recurring Cashflow Patterns (Phase 11) ---- */
     let recurringFlows = { unreservedExpenses: 0, totalExpectedIncome: 0, projectedExpenses: [], projectedIncome: [] };
@@ -88,6 +122,7 @@ const CashflowIntelligence = (() => {
       avgDailyExpenses,
       settlementT1,
       settlementT2,
+      settlementDelayDays,
       obligationsByDay,
       recurringExpensesByDay,
       recurringIncomeByDay,
@@ -98,11 +133,19 @@ const CashflowIntelligence = (() => {
     const projectedEndingCash = projection.values[windowDays - 1] || availableCash;
 
     /* ---- Expected Incoming Cash (window period) ---- */
+    let effectiveSettlementInWindow = pendingSettlement;
+    if (settlementDelayDays >= windowDays) {
+      effectiveSettlementInWindow = 0;
+    } else if (1 + settlementDelayDays >= windowDays) {
+      effectiveSettlementInWindow = 0;
+    } else if (2 + settlementDelayDays >= windowDays) {
+      effectiveSettlementInWindow = settlementT1;
+    }
     const recurringIncomeTotal = (recurringFlows.totalExpectedIncome || 0);
-    const expectedIncoming = Math.round(avgDailyIncome * windowDays) + pendingSettlement + recurringIncomeTotal;
+    const expectedIncoming = Math.round(avgDailyIncome * windowDays) + effectiveSettlementInWindow + recurringIncomeTotal;
 
     /* ---- Expected Outgoing Cash (window period) ---- */
-    const obligationsTotal = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const obligationsTotal = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0) + additionalObligationsTotal;
     const unreservedRecurringExpenseTotal = (recurringFlows.unreservedExpenses || 0);
     const expectedOutgoing = Math.round(avgDailyExpenses * windowDays) + obligationsTotal + unreservedRecurringExpenseTotal;
 
@@ -367,6 +410,7 @@ const CashflowIntelligence = (() => {
     avgDailyExpenses,
     settlementT1,
     settlementT2,
+    settlementDelayDays = 0,
     obligationsByDay,
     recurringExpensesByDay = [],
     recurringIncomeByDay = [],
@@ -375,6 +419,9 @@ const CashflowIntelligence = (() => {
     const values = [];
     let running = startCash;
     const FLOOR = 500;
+
+    const t1Day = 1 + settlementDelayDays;
+    const t2Day = 2 + settlementDelayDays;
 
     for (let day = 0; day < windowDays; day++) {
       if (day === 0) {
@@ -385,8 +432,8 @@ const CashflowIntelligence = (() => {
       // Daily organic inflow (income from sales)
       const dailyInflow = avgDailyIncome;
 
-      // Settlement arrivals
-      const settlement = (day === 1 ? settlementT1 : (day === 2 ? settlementT2 : 0));
+      // Settlement arrivals (T+1 and T+2, shifted by settlementDelayDays)
+      const settlement = (day === t1Day ? settlementT1 : (day === t2Day ? settlementT2 : 0));
 
       // Scheduled obligation outflows
       const obligation = obligationsByDay[day] || 0;

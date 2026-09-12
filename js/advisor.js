@@ -568,6 +568,41 @@ const CashlyAdvisor = (() => {
       }
     }
 
+    // RULE 12 — ACTIVE WHAT-IF SCENARIO ADVISORY (Phase 12)
+    if (typeof CashflowScenarioEngine !== 'undefined' && typeof CashflowScenarioEngine.getLastScenario === 'function') {
+      const activeScenario = CashflowScenarioEngine.getLastScenario();
+      if (activeScenario && activeScenario.riskLevel) {
+        const isRisk = activeScenario.riskLevel === 'Risk';
+        const isCaution = activeScenario.riskLevel === 'Caution';
+        
+        let scenTitle = 'What-If Scenario Active';
+        if (activeScenario.type === 'purchase') {
+          scenTitle = `Simulated purchase (${fmt(activeScenario.params.amount)})`;
+        } else if (activeScenario.type === 'sales_change') {
+          scenTitle = `Simulated sales change (${activeScenario.params.percentChange >= 0 ? '+' : ''}${activeScenario.params.percentChange}%)`;
+        } else if (activeScenario.type === 'expense_change') {
+          scenTitle = `Simulated expense change (${activeScenario.params.percentChange >= 0 ? '+' : ''}${activeScenario.params.percentChange}%)`;
+        } else if (activeScenario.type === 'delayed_settlement') {
+          scenTitle = `Simulated settlement delay (${activeScenario.params.delayDays} days)`;
+        } else if (activeScenario.type === 'upcoming_obligation') {
+          scenTitle = `Simulated payment (${fmt(activeScenario.params.amount)})`;
+        }
+
+        recs.push({
+          id: 'rec_active_scenario',
+          type: 'scenario_simulation',
+          priority: isRisk ? 'high' : (isCaution ? 'medium' : 'low'),
+          severity: isRisk ? 'risk' : (isCaution ? 'caution' : 'healthy'),
+          icon: isRisk ? iconRisk() : (isCaution ? iconCaution() : iconHealthy()),
+          title: scenTitle,
+          message: activeScenario.recommendation,
+          reason: activeScenario.whyExplanation,
+          action: 'Adjust scenario inputs in the Cashflow Planner or click Reset / Clear to return to base metrics.',
+          created_at: now,
+        });
+      }
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({
@@ -869,6 +904,11 @@ const CashlyAdvisor = (() => {
     // 6. Render Recurring Cashflow Patterns & Anomalies (Phase 11)
     if (typeof CashflowPatterns !== 'undefined' && typeof CashflowPatterns.render === 'function') {
       CashflowPatterns.render('insights-patterns-container');
+    }
+
+    // 7. Render Cashflow Planner & What-If Scenarios (Phase 12)
+    if (typeof CashflowScenarioEngine !== 'undefined' && typeof CashflowScenarioEngine.render === 'function') {
+      CashflowScenarioEngine.render('insights-scenarios-container');
     }
   }
 
