@@ -1036,6 +1036,16 @@
             <!-- Dynamically populated by CashflowScenarioEngine.render() -->
           </div>
 
+          <!-- Goals & Budgets (Phase 13) -->
+          <div id="insights-goals-budgets-container" style="margin-bottom:var(--sp-6);">
+            <div id="insights-goals-container" style="margin-bottom:var(--sp-6);">
+              <!-- Dynamically populated by BusinessGoalsEngine.render() -->
+            </div>
+            <div id="insights-budgets-container" style="margin-bottom:var(--sp-6);">
+              <!-- Dynamically populated by BudgetEngine.render() -->
+            </div>
+          </div>
+
         </section>
         <!-- /PAGE: INSIGHTS -->
 
@@ -2007,6 +2017,114 @@
   </div>
 
   <!-- ============================================================
+     MODAL: CREATE BUSINESS GOAL (Phase 13)
+     ============================================================ -->
+  <div class="modal-overlay hidden" id="modal-create-goal" role="dialog" aria-modal="true" aria-labelledby="modal-goal-heading" style="display:none;">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-goal-heading">Create Business Goal</h2>
+        <button class="modal-close" id="btn-goal-close" aria-label="Close modal" onclick="BusinessGoalsEngine.closeCreateModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="form-create-goal" onsubmit="BusinessGoalsEngine.handleCreateSubmit(event)">
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
+          <div class="form-group">
+            <label class="form-label" for="goal-title">Goal Title *</label>
+            <input type="text" id="goal-title" class="form-input" placeholder="e.g. Maintain ₹30,000 Cash" required>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label class="form-label" for="goal-type">Goal Type *</label>
+              <select id="goal-type" class="form-input">
+                <option value="cash_target">Cash Target</option>
+                <option value="savings_target">Savings / Reserve Target</option>
+                <option value="sales_target">Sales Target</option>
+                <option value="expense_limit">Expense Limit</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="goal-amount">Target Amount (₹) *</label>
+              <input type="number" id="goal-amount" class="form-input" placeholder="30000" min="1" step="any" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="goal-date">Target Date (Optional)</label>
+            <input type="date" id="goal-date" class="form-input">
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+            <button type="button" class="btn btn-secondary" onclick="BusinessGoalsEngine.closeCreateModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-goal-submit">Create Goal</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================
+     MODAL: CREATE BUDGET (Phase 13)
+     ============================================================ -->
+  <div class="modal-overlay hidden" id="modal-create-budget" role="dialog" aria-modal="true" aria-labelledby="modal-budget-heading" style="display:none;">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-budget-heading">Create Spending Budget</h2>
+        <button class="modal-close" id="btn-budget-close" aria-label="Close modal" onclick="BudgetEngine.closeCreateModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="form-create-budget" onsubmit="BudgetEngine.handleCreateSubmit(event)">
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
+          <div class="form-group">
+            <label class="form-label" for="budget-name">Budget Name *</label>
+            <input type="text" id="budget-name" class="form-input" placeholder="e.g. Stock Purchases" required>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label class="form-label" for="budget-category">Category</label>
+              <select id="budget-category" class="form-input">
+                <option value="all">All Expenses</option>
+                <option value="stock">Stock</option>
+                <option value="supplier">Supplier</option>
+                <option value="rent">Rent</option>
+                <option value="utilities">Utilities</option>
+                <option value="wages">Wages</option>
+                <option value="personal">Personal</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="budget-amount">Budget Limit (₹) *</label>
+              <input type="number" id="budget-amount" class="form-input" placeholder="10000" min="1" step="any" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="budget-period">Period *</label>
+            <select id="budget-period" class="form-input" onchange="document.getElementById('budget-custom-dates').style.display = this.value === 'custom' ? 'grid' : 'none';">
+              <option value="monthly">Monthly (Current Calendar Month)</option>
+              <option value="weekly">Weekly (Current Calendar Week)</option>
+              <option value="custom">Custom Date Range</option>
+            </select>
+          </div>
+          <div id="budget-custom-dates" style="display:none; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label class="form-label" for="budget-start-date">Start Date</label>
+              <input type="date" id="budget-start-date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="budget-end-date">End Date</label>
+              <input type="date" id="budget-end-date" class="form-input">
+            </div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+            <button type="button" class="btn btn-secondary" onclick="BudgetEngine.closeCreateModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-budget-submit">Create Budget</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================
      SCRIPTS
      ============================================================ -->
   <script>
@@ -2031,6 +2149,9 @@
   <script src="js/cashflow.js"></script>
   <!-- Cashflow Scenario Engine (Phase 12) -->
   <script src="js/scenarios.js"></script>
+  <!-- Business Goals & Budgets Engines (Phase 13) -->
+  <script src="js/goals.js"></script>
+  <script src="js/budgets.js"></script>
   <script src="js/router.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/transactions.js"></script>

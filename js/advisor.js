@@ -603,6 +603,93 @@ const CashlyAdvisor = (() => {
       }
     }
 
+    // RULE 13 — BUSINESS GOALS FEEDBACK (Phase 13)
+    if (typeof BusinessGoalsEngine !== 'undefined' && typeof BusinessGoalsEngine.getActiveGoals === 'function') {
+      const activeGoals = BusinessGoalsEngine.getActiveGoals();
+      activeGoals.forEach(g => {
+        const p = BusinessGoalsEngine.calculateProgress(g);
+        if (!p) return;
+
+        if (p.status === 'At Risk' || (p.forecastNote && p.forecastNote.includes('below your target'))) {
+          recs.push({
+            id: `rec_goal_risk_${g.id}`,
+            type: 'goal_progress',
+            priority: 'high',
+            severity: 'risk',
+            icon: iconRisk(),
+            title: `Goal at risk: ${g.title}`,
+            message: p.forecastNote || `You are ${fmt(p.remaining)} away from your target with ${p.daysRemaining} days remaining.`,
+            reason: `Current progress is ${p.progressPercentage}% (${fmt(p.currentValue)} of ${fmt(p.targetAmount)}). Daily burn and forecast trajectory indicate difficulty meeting this deadline without adjusting expenses.`,
+            action: 'Postpone non-essential expenses and accelerate receivables to protect your target.',
+            created_at: now,
+          });
+        } else if (p.status === 'Needs Attention') {
+          recs.push({
+            id: `rec_goal_attention_${g.id}`,
+            type: 'goal_progress',
+            priority: 'medium',
+            severity: 'caution',
+            icon: iconCaution(),
+            title: `Goal pacing needs attention: ${g.title}`,
+            message: `You are ${fmt(p.remaining)} away from your target. Approximately ${p.dailyRateRequired ? fmt(p.dailyRateRequired) + '/day' : 'extra sales'} required.`,
+            reason: `Achieved ${p.progressPercentage}% of ${fmt(p.targetAmount)}.`,
+            action: 'Review scheduled outlays and monitor daily sales to stay on track.',
+            created_at: now,
+          });
+        } else if (p.goalType === 'sales_target' && p.progressPercentage >= 50 && p.status !== 'Completed') {
+          recs.push({
+            id: `rec_goal_sales_pacing_${g.id}`,
+            type: 'goal_progress',
+            priority: 'low',
+            severity: 'healthy',
+            icon: iconHealthy(),
+            title: `Sales milestone pacing well`,
+            message: `You have achieved ${p.progressPercentage}% of your monthly sales target (${fmt(p.currentValue)} / ${fmt(p.targetAmount)}).`,
+            reason: `${fmt(p.remaining)} remaining to achieve ${g.title}.`,
+            action: 'Maintain momentum to complete your target ahead of schedule.',
+            created_at: now,
+          });
+        }
+      });
+    }
+
+    // RULE 14 — SPENDING BUDGET WATCH (Phase 13)
+    if (typeof BudgetEngine !== 'undefined' && typeof BudgetEngine.getActiveBudgets === 'function') {
+      const activeBudgets = BudgetEngine.getActiveBudgets();
+      activeBudgets.forEach(b => {
+        const c = BudgetEngine.calculateBudget(b);
+        if (!c) return;
+
+        if (c.status === 'Exceeded') {
+          recs.push({
+            id: `rec_budget_exceeded_${b.id}`,
+            type: 'budget_limit',
+            priority: 'high',
+            severity: 'risk',
+            icon: iconRisk(),
+            title: `Budget exceeded: ${b.name}`,
+            message: `${b.name} spending has reached ${fmt(c.spent)}, exceeding your limit of ${fmt(c.limit)} by ${fmt(c.spent - c.limit)}.`,
+            reason: `Recorded ${c.transactionCount} expenses totaling ${fmt(c.spent)} during the current ${b.period} period.`,
+            action: 'Freeze discretionary purchases in this category until the new budget cycle starts.',
+            created_at: now,
+          });
+        } else if (c.status === 'Caution') {
+          recs.push({
+            id: `rec_budget_caution_${b.id}`,
+            type: 'budget_limit',
+            priority: 'medium',
+            severity: 'caution',
+            icon: iconCaution(),
+            title: `Budget near limit: ${b.name}`,
+            message: `${b.name} spending has reached ${c.percentageUsed}% of its limit (${fmt(c.spent)} of ${fmt(c.limit)}).`,
+            reason: `Only ${fmt(c.remaining)} remains for the rest of the period.`,
+            action: 'Limit further spending in this category to avoid exceeding your budget.',
+            created_at: now,
+          });
+        }
+      });
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({
@@ -909,6 +996,14 @@ const CashlyAdvisor = (() => {
     // 7. Render Cashflow Planner & What-If Scenarios (Phase 12)
     if (typeof CashflowScenarioEngine !== 'undefined' && typeof CashflowScenarioEngine.render === 'function') {
       CashflowScenarioEngine.render('insights-scenarios-container');
+    }
+
+    // 8. Render Business Goals & Budgets (Phase 13)
+    if (typeof BusinessGoalsEngine !== 'undefined' && typeof BusinessGoalsEngine.render === 'function') {
+      BusinessGoalsEngine.render('insights-goals-container');
+    }
+    if (typeof BudgetEngine !== 'undefined' && typeof BudgetEngine.render === 'function') {
+      BudgetEngine.render('insights-budgets-container');
     }
   }
 

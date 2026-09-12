@@ -1320,6 +1320,284 @@ const SupabaseService = (() => {
     }
   }
 
+  /* ============================================================
+     BUSINESS GOALS CRUD METHODS (Phase 13)
+     ============================================================ */
+
+  function mapRowToGoal(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      title: row.title,
+      goalType: row.goal_type,
+      targetAmount: Number(row.target_amount) || 0,
+      targetDate: row.target_date || null,
+      status: row.status || 'active',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  function mapGoalToRow(goal, businessId) {
+    return {
+      id: goal.id || generateUUID(),
+      business_id: businessId,
+      title: goal.title,
+      goal_type: goal.goalType,
+      target_amount: Number(goal.targetAmount) || 0,
+      target_date: goal.targetDate || null,
+      status: goal.status || 'active',
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  async function fetchGoals() {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return [];
+
+      let query = _client
+        .from('business_goals')
+        .select('*')
+        .eq('business_id', biz.id)
+        .order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice fetching goals from Supabase:', error.message || error);
+        return null;
+      }
+      return (data || []).map(mapRowToGoal);
+    } catch (err) {
+      console.warn('[Cashly] Notice fetching goals from Supabase:', err.message || err);
+      return null;
+    }
+  }
+
+  async function createGoal(goal) {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return null;
+
+      const row = mapGoalToRow(goal, biz.id);
+      const { data, error } = await _client.from('business_goals').insert([row]).select();
+      if (error) {
+        console.warn('[Cashly] Notice creating goal in Supabase:', error.message || error);
+        return null;
+      }
+      return data && data[0] ? mapRowToGoal(data[0]) : mapRowToGoal(row);
+    } catch (err) {
+      console.warn('[Cashly] Notice creating goal in Supabase:', err.message || err);
+      return null;
+    }
+  }
+
+  async function updateGoal(id, updates) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return false;
+
+      const dbUpdates = { updated_at: new Date().toISOString() };
+      if (updates.title !== undefined) dbUpdates.title = updates.title;
+      if (updates.goalType !== undefined) dbUpdates.goal_type = updates.goalType;
+      if (updates.targetAmount !== undefined) dbUpdates.target_amount = Number(updates.targetAmount) || 0;
+      if (updates.targetDate !== undefined) dbUpdates.target_date = updates.targetDate || null;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+
+      const { error } = await _client
+        .from('business_goals')
+        .update(dbUpdates)
+        .eq('id', id)
+        .eq('business_id', biz.id);
+
+      if (error) {
+        console.warn('[Cashly] Notice updating goal in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice updating goal in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  async function deleteGoal(id) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return false;
+
+      const { error } = await _client
+        .from('business_goals')
+        .delete()
+        .eq('id', id)
+        .eq('business_id', biz.id);
+
+      if (error) {
+        console.warn('[Cashly] Notice deleting goal from Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice deleting goal from Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  /* ============================================================
+     BUDGETS CRUD METHODS (Phase 13)
+     ============================================================ */
+
+  function mapRowToBudget(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      name: row.name,
+      category: row.category || null,
+      amount: Number(row.amount) || 0,
+      period: row.period || 'monthly',
+      startDate: row.start_date || null,
+      endDate: row.end_date || null,
+      status: row.status || 'active',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  function mapBudgetToRow(budget, businessId) {
+    return {
+      id: budget.id || generateUUID(),
+      business_id: businessId,
+      name: budget.name,
+      category: budget.category || null,
+      amount: Number(budget.amount) || 0,
+      period: budget.period || 'monthly',
+      start_date: budget.startDate || null,
+      end_date: budget.endDate || null,
+      status: budget.status || 'active',
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  async function fetchBudgets() {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return [];
+
+      let query = _client
+        .from('budgets')
+        .select('*')
+        .eq('business_id', biz.id)
+        .order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[Cashly] Notice fetching budgets from Supabase:', error.message || error);
+        return null;
+      }
+      return (data || []).map(mapRowToBudget);
+    } catch (err) {
+      console.warn('[Cashly] Notice fetching budgets from Supabase:', err.message || err);
+      return null;
+    }
+  }
+
+  async function createBudget(budget) {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return null;
+
+      const row = mapBudgetToRow(budget, biz.id);
+      const { data, error } = await _client.from('budgets').insert([row]).select();
+      if (error) {
+        console.warn('[Cashly] Notice creating budget in Supabase:', error.message || error);
+        return null;
+      }
+      return data && data[0] ? mapRowToBudget(data[0]) : mapRowToBudget(row);
+    } catch (err) {
+      console.warn('[Cashly] Notice creating budget in Supabase:', err.message || err);
+      return null;
+    }
+  }
+
+  async function updateBudget(id, updates) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return false;
+
+      const dbUpdates = { updated_at: new Date().toISOString() };
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.category !== undefined) dbUpdates.category = updates.category || null;
+      if (updates.amount !== undefined) dbUpdates.amount = Number(updates.amount) || 0;
+      if (updates.period !== undefined) dbUpdates.period = updates.period;
+      if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate || null;
+      if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate || null;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+
+      const { error } = await _client
+        .from('budgets')
+        .update(dbUpdates)
+        .eq('id', id)
+        .eq('business_id', biz.id);
+
+      if (error) {
+        console.warn('[Cashly] Notice updating budget in Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice updating budget in Supabase:', err.message || err);
+      return false;
+    }
+  }
+
+  async function deleteBudget(id) {
+    await ensureConnected();
+    if (!isConnected() || !id) return false;
+
+    try {
+      const biz = _currentBusiness;
+      if (!biz || !biz.id) return false;
+
+      const { error } = await _client
+        .from('budgets')
+        .delete()
+        .eq('id', id)
+        .eq('business_id', biz.id);
+
+      if (error) {
+        console.warn('[Cashly] Notice deleting budget from Supabase:', error.message || error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Cashly] Notice deleting budget from Supabase:', err.message || err);
+      return false;
+    }
+  }
+
   return {
     init,
     ensureConnected,
@@ -1352,6 +1630,15 @@ const SupabaseService = (() => {
     markAlertRead,
     markAllAlertsRead,
     deleteAlert,
+    // Phase 13: Goals & Budgets
+    fetchGoals,
+    createGoal,
+    updateGoal,
+    deleteGoal,
+    fetchBudgets,
+    createBudget,
+    updateBudget,
+    deleteBudget,
   };
 })();
 

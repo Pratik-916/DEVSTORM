@@ -43,6 +43,11 @@ const AlertEngine = (() => {
     LARGE_EXPENSE:             'large_expense',
     FORECAST_7_DAY_RISK:       'forecast_7_day_risk',
     FORECAST_30_DAY_CAUTION:   'forecast_30_day_caution',
+    // Phase 13: Goals & Budgets
+    BUDGET_EXCEEDED:           'budget_exceeded',
+    BUDGET_WARNING:            'budget_warning',
+    GOAL_DEADLINE_RISK:        'goal_deadline_risk',
+    CASH_TARGET_RISK:          'cash_target_risk',
   };
 
   /* ============================================================
@@ -244,6 +249,76 @@ const AlertEngine = (() => {
       }
     }
 
+    /* ---- Rule 12: Budgets (exceeded or caution) ---- */
+    if (typeof BudgetEngine !== 'undefined') {
+      const activeBudgets = BudgetEngine.getActiveBudgets();
+      activeBudgets.forEach(b => {
+        const calc = BudgetEngine.calculateBudget(b);
+        if (calc.status === 'Exceeded' || calc.percentage_used >= 100) {
+          const typeKey = `${TYPES.BUDGET_EXCEEDED}_${b.id || b.name}`;
+          if (!_isDuplicate(typeKey)) {
+            triggered.push({
+              type: typeKey,
+              severity: 'risk',
+              title: `Budget exceeded: ${b.name}`,
+              message: `${b.name} spending has reached ${fmt(calc.spent)} (${calc.percentage_used.toFixed(0)}% of limit ${fmt(calc.limit)}). You have exceeded this budget by ${fmt(calc.spent - calc.limit)}.`,
+            });
+          }
+        } else if (calc.status === 'Caution' || (calc.percentage_used >= 80 && calc.percentage_used < 100)) {
+          const typeKey = `${TYPES.BUDGET_WARNING}_${b.id || b.name}`;
+          if (!_isDuplicate(typeKey)) {
+            triggered.push({
+              type: typeKey,
+              severity: 'caution',
+              title: `Budget caution: ${b.name}`,
+              message: `${b.name} spending has reached ${fmt(calc.spent)} (${calc.percentage_used.toFixed(0)}% of limit ${fmt(calc.limit)}). Only ${fmt(calc.remaining)} remaining.`,
+            });
+          }
+        }
+      });
+    }
+
+    /* ---- Rule 13: Goals (cash target risk & deadline risk) ---- */
+    if (typeof BusinessGoalsEngine !== 'undefined') {
+      const activeGoals = BusinessGoalsEngine.getActiveGoals();
+      activeGoals.forEach(g => {
+        const calc = BusinessGoalsEngine.calculateProgress(g);
+
+        // Cash target or savings target risk from forecast
+        if ((g.goal_type === 'cash_target' || g.goal_type === 'savings_target') && calc.status !== 'Completed') {
+          if (calc.forecast_achievable === false || calc.status === 'At Risk') {
+            const typeKey = `${TYPES.CASH_TARGET_RISK}_${g.id || g.title}`;
+            if (!_isDuplicate(typeKey)) {
+              triggered.push({
+                type: typeKey,
+                severity: 'risk',
+                title: `Cash target at risk: ${g.title}`,
+                message: `Forecast indicates target ${fmt(calc.target_value)} may not be met (${calc.forecast_note || (fmt(calc.remaining) + ' short')}).`,
+              });
+            }
+          }
+        }
+
+        // Target deadline risk (within 7 days and under 70% completed)
+        if (g.target_date && calc.status !== 'Completed') {
+          const targetDate = new Date(g.target_date);
+          targetDate.setHours(0, 0, 0, 0);
+          const diffDays = Math.round((targetDate.getTime() - today.getTime()) / 86400000);
+          if (diffDays >= 0 && diffDays <= 7 && calc.progress_percentage < 70) {
+            const typeKey = `${TYPES.GOAL_DEADLINE_RISK}_${g.id || g.title}`;
+            if (!_isDuplicate(typeKey)) {
+              triggered.push({
+                type: typeKey,
+                severity: 'caution',
+                title: `Goal deadline near: ${g.title}`,
+                message: `Goal "${g.title}" target date is in ${diffDays === 0 ? 'today' : diffDays + ' day(s)'} but progress is currently ${calc.progress_percentage.toFixed(0)}% (${fmt(calc.current_value)} / ${fmt(calc.target_value)}).`,
+              });
+            }
+          }
+        }
+      });
+    }
+
     return triggered;
   }
 
@@ -418,6 +493,7 @@ const AlertEngine = (() => {
    * Update the unread count badge on the bell icon.
    */
   function renderBadge() {
+    if (typeof document === 'undefined') return;
     const dot = document.querySelector('#btn-notifications .notif-dot');
     const count = _unreadCount();
 
@@ -437,6 +513,7 @@ const AlertEngine = (() => {
    * Render the live alert dropdown content.
    */
   function renderDropdown() {
+    if (typeof document === 'undefined') return;
     const container = document.getElementById('notif-list-container');
     if (!container) return;
 
@@ -540,4 +617,15 @@ const AlertEngine = (() => {
 })();
 
 // Initialise UI bindings on DOM ready
-document.addEventListener('DOMContentLoaded', AlertEngine.initUI);
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', AlertEngine.initUI);
+}
+
+// Global & Module Export
+if (typeof window !== 'undefined') {
+  window.AlertEngine = AlertEngine;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AlertEngine };
+}

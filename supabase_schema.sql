@@ -89,6 +89,36 @@ CREATE TABLE IF NOT EXISTS public.alerts (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 6. BUSINESS GOALS TABLE (Phase 13)
+-- Tracks cash targets, savings reserves, sales quotas, and expense caps.
+CREATE TABLE IF NOT EXISTS public.business_goals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    goal_type TEXT NOT NULL CHECK (goal_type IN ('cash_target', 'savings_target', 'sales_target', 'expense_limit')),
+    target_amount NUMERIC NOT NULL CHECK (target_amount > 0),
+    target_date DATE,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 7. BUDGETS TABLE (Phase 13)
+-- Tracks category-based spending allocations and operational cost limits.
+CREATE TABLE IF NOT EXISTS public.budgets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    category TEXT,
+    amount NUMERIC NOT NULL CHECK (amount > 0),
+    period TEXT NOT NULL DEFAULT 'monthly' CHECK (period IN ('weekly', 'monthly', 'custom')),
+    start_date DATE,
+    end_date DATE,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================
 -- PERFORMANCE INDEXES
 -- ============================================================
@@ -103,6 +133,10 @@ CREATE INDEX IF NOT EXISTS idx_alerts_business_id ON public.alerts (business_id)
 CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON public.alerts (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_alerts_business_unread ON public.alerts (business_id, is_read, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_provider_tx ON public.transactions (provider, provider_account_id, provider_transaction_id);
+CREATE INDEX IF NOT EXISTS idx_business_goals_business_id ON public.business_goals (business_id);
+CREATE INDEX IF NOT EXISTS idx_business_goals_status ON public.business_goals (business_id, status);
+CREATE INDEX IF NOT EXISTS idx_budgets_business_id ON public.budgets (business_id);
+CREATE INDEX IF NOT EXISTS idx_budgets_status ON public.budgets (business_id, status);
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS) PREPARATION & POLICIES
@@ -112,6 +146,8 @@ ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.financial_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.upcoming_obligations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 
 -- 1. Businesses Policies
 DROP POLICY IF EXISTS "Owners can manage own businesses" ON public.businesses;
@@ -194,3 +230,22 @@ FOR ALL
 TO authenticated
 USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))
 WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()));
+
+-- 6. Business Goals Policies (Phase 13)
+DROP POLICY IF EXISTS "Owners can manage business goals" ON public.business_goals;
+CREATE POLICY "Owners can manage business goals"
+ON public.business_goals
+FOR ALL
+TO authenticated
+USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))
+WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()));
+
+-- 7. Budgets Policies (Phase 13)
+DROP POLICY IF EXISTS "Owners can manage budgets" ON public.budgets;
+CREATE POLICY "Owners can manage budgets"
+ON public.budgets
+FOR ALL
+TO authenticated
+USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))
+WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()));
+

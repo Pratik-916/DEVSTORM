@@ -383,7 +383,67 @@ Every scenario result generates a 5-part explainable breakdown:
 
 ---
 
-## 10. Local Development Setup
+## 10. Business Goals & Budgets (Phase 13)
+
+Cashly Phase 13 introduces a deterministic, explainable business planning layer enabling vendors to set financial targets and spending budgets, comparing performance in real time against authenticated business ledger data.
+
+> [!IMPORTANT]
+> **Planning Tool Guarantee**: Goals and budgets are planning tools. They do not modify actual transactions, balances or obligations. Creating, editing, or deleting planning records has zero impact on Available Cash, Safe to Spend, historical transactions, or scheduled bills.
+
+### Goal Types
+1. **Cash Target (`cash_target`)**:
+   - Compares live Available Cash against merchant target amount.
+   - Formula: Progress = min(100, (Available Cash / Target Amount) * 100)%.
+   - Remaining = max(0, Target Amount - Available Cash).
+2. **Savings / Reserve Target (`savings_target`)**:
+   - Tracks unencumbered operational reserves retained after scheduled obligations and safety buffer using `Safe to Spend`.
+   - *Limitation*: Savings and reserve targets use the existing Cashly financial model and do not represent a separate savings ledger.
+3. **Sales Target (`sales_target`)**:
+   - Calculates realized, settled sales recognized in the target calendar month.
+   - Strictly respects settlement status: pending digital transactions awaiting settlement clearance are never counted as settled revenue.
+4. **Expense Limit (`expense_limit`)**:
+   - Calculates operational expense spending across the current calendar month against a predefined spending cap.
+   - Formula: Used = (Actual Expenses / Limit Amount) * 100%.
+
+### Goal Status Rules
+Goals are dynamically evaluated without altering database status fields:
+- **Completed**: Current calculated progress reaches or exceeds 100%.
+- **Overdue**: Target deadline has passed and progress is under 100%.
+- **At Risk**: Target deadline is within 7 days with <70% progress, or 30-day forecast projection falls below target.
+- **Needs Attention**: Target deadline within 14 days with <50% progress, or forecast gap detected.
+- **On Track**: Steady progress meeting or exceeding pacing expectations (>= 80% or ahead of deadline).
+
+### Spending Budgets
+Vendors can create spending budgets with exact category matching:
+- **Budget Categories**: All expenses (`all`), `stock`, `supplier`, `rent`, `utilities`, `wages`, `personal`, and `other`.
+- **Supported Periods**:
+  - `weekly`: Current calendar week (Monday to Sunday).
+  - `monthly`: Current calendar month (1st to last day of month).
+  - `custom`: Custom user-defined date range (`start_date` through `end_date`).
+
+### Budget Status Thresholds
+Budget usage is calculated strictly from matching expense transactions in the active period:
+- **Healthy**: < 80% of budget limit spent.
+- **Caution**: >= 80% and < 100% of budget limit spent.
+- **Exceeded**: >= 100% of budget limit spent.
+
+### Forecast, Advisor & Alert Integration
+- **Cashflow Intelligence Forecast Integration**: Compares 30-day projected ending cash against target amounts, explaining whether the goal is on track or quantifying the forecast gap without mutating the underlying forecast.
+- **CashlyAdvisor**: Generates contextual recommendations directly highlighting progress, upcoming goal deadlines, and caution/exceeded budget categories.
+- **Alert Engine Integration**: Emits deduplicated in-app alerts:
+  - `BUDGET_EXCEEDED`: Risk alert when category spending reaches or surpasses 100%.
+  - `BUDGET_WARNING`: Caution alert when category spending reaches 80%–99%.
+  - `GOAL_DEADLINE_RISK`: Caution alert when target deadline is <= 7 days away with <70% completion.
+  - `CASH_TARGET_RISK`: Risk alert when 30-day projected cash outlook indicates target will fall short.
+
+### Security, RLS & Multi-Tenant Isolation
+- Tables `public.business_goals` and `public.budgets` have PostgreSQL Row Level Security (RLS) enabled.
+- Access policies strictly verify `business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())` for SELECT, INSERT, UPDATE, and DELETE.
+- Zero cross-tenant data leakage: no frontend-supplied `business_id` is trusted without RLS ownership verification.
+
+---
+
+## 11. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -407,7 +467,7 @@ Every scenario result generates a 5-part explainable breakdown:
 3. Set up Database Schema:
    - Open your Supabase Dashboard -> **SQL Editor**.
    - Copy the contents of [`supabase_schema.sql`](supabase_schema.sql).
-   - Click **Run**. All 5 tables, indexes, and RLS policies will be created.
+   - Click **Run**. All tables, indexes, and RLS policies will be created.
 
 4. Start Local Server:
    ```bash
@@ -417,7 +477,7 @@ Every scenario result generates a 5-part explainable breakdown:
 
 ---
 
-## 11. Deployment (Vercel / Netlify)
+## 12. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -429,15 +489,16 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 12. Current Limitations
+## 13. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
 3. **PWA Scope**: Service Worker pre-caches the complete application shell for offline browsing; transaction mutations require an active network connection to write to the cloud database.
 4. **Hypothetical Scenario Boundary**: Scenario simulations are local in-memory tools for vendor decision-support and do not automatically sync with external accounting software.
+5. **Reserve & Savings Ledger**: Cashly tracks liquid reserves through Safe to Spend without a dedicated savings account ledger.
 
 ---
 
-## 13. License
+## 14. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.
