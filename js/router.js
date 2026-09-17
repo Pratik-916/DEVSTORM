@@ -70,6 +70,9 @@ const Router = (() => {
       if (typeof KPIEngine !== 'undefined' && typeof KPIEngine.render === 'function') {
         KPIEngine.render('insights-kpi-container');
       }
+      if (typeof CashPlanningEngine !== 'undefined' && typeof CashPlanningEngine.render === 'function') {
+        CashPlanningEngine.render('insights-cash-planning-container');
+      }
       if (typeof CashflowCalendarEngine !== 'undefined' && typeof CashflowCalendarEngine.render === 'function') {
         CashflowCalendarEngine.render('insights-calendar-container');
       }

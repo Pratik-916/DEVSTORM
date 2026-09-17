@@ -708,12 +708,71 @@ For each window, computes:
 - **Cashly Advisor (Rule 22 - Reserve Planning Shortfall)**: Triggers an explainable warning when total Required Reserve exceeds current Available Cash, detailing exact shortfall amounts and recommended cash preservation steps.
 
 ### Application Versioning
-- Application release upgraded from **v1.1** to **v1.2** (Phase 17 completed).
-- Service Worker offline cache updated from `cashly-cache-v6` to `cashly-cache-v7` with full offline support for `js/payment-readiness.js`.
+- Application release upgraded from **v1.2** to **v1.3** (Phase 18 completed).
+- Service Worker offline cache updated from `cashly-cache-v7` to `cashly-cache-v8` with full offline support for `js/cash-planning.js`.
 
 ---
 
-## 15. Local Development Setup
+## 15. Business Cash Planning & Cashflow Plan (Phase 18)
+
+Phase 18 introduces a deterministic, explainable, read-only planning layer (`CashPlanningEngine` in [`js/cash-planning.js`](file:///d:/Projects/DEVSTORM/js/cash-planning.js)) designed to help micro-merchants understand and plan their liquid cash position over coming weeks.
+
+### Core Objectives
+The Cash Planning layer answers three fundamental vendor questions:
+1. *"What will my cash position look like over the next 7, 14, and 30 days?"*
+2. *"What essential commitments are coming, and how do they impact my cash curve?"*
+3. *"Where are my future cash pressure points, and when should I preserve cash?"*
+
+### Architecture & Financial Invariants
+- **Zero Redundant Forecast Engines**: Consumes existing forecast curves from `CashflowIntelligence` and `CashflowCalendarEngine`.
+- **Strict Available Cash Invariants**: Current Available Cash strictly comes from settled balances (`CashflowEngine`). Pending settlements and expected future inflows are **NEVER** added to Current Available Cash.
+- **Strict Status Separation**: Cashflow event statuses (`ACTUAL`, `PENDING`, `EXPECTED`, `SCHEDULED`, `PROJECTED`) remain visually and logically distinct from Payment Readiness statuses (`READY`, `WATCH`, `NOT COVERED`).
+- **100% Read-Only Orchestration Layer**: Zero database mutations, zero transaction record modifications, zero `localStorage` state pollution.
+
+### Planning Horizons (7, 14, 30 Days)
+Provides normalized daily planning timelines and summary metrics across three standard vendor horizons:
+- **7-Day Horizon**: Immediate weekly payment commitments and cash trough identification.
+- **14-Day Horizon**: Short-term liquidity and bi-weekly commitment outlook.
+- **30-Day Horizon**: Monthly cash flow trajectory and long-term obligation planning.
+
+For each horizon, computes:
+- **Starting Available Cash**: Settled liquid cash balance.
+- **Expected Incoming**: Separate total of expected customer receipts and pending clearances.
+- **Expected Outgoing**: Total of scheduled and expected obligations due in horizon.
+- **Projected Ending Cash**: Forecasted cash position at end of horizon.
+- **Minimum Projected Cash**: Lowest projected liquid cash point (trough) during horizon.
+- **Essential Commitments**: High-priority obligations due in horizon.
+- **Pressure Points**: Automated detection of cash risks.
+
+### Daily Planning Timeline
+Normalizes daily cash movements across the selected horizon, displaying for each day:
+- Date & day offset
+- Expected incoming and outgoing cash flows
+- Net movement (`Expected Incoming - Expected Outgoing`)
+- Projected ending cash position
+- Scheduled obligations with Payment Readiness indicators (`READY`, `WATCH`, `NOT COVERED`)
+- Daily pressure status (`DEFICIT`, `BUFFER_BREACH`, `HEALTHY`)
+
+### Automated Pressure Point Signals
+Identifies future cash risks using established thresholds from existing Cashly engines:
+1. **Cash Deficit**: Projected ending cash drops to $\le 0$ on any day in horizon.
+2. **Buffer Breach**: Projected ending cash drops below safety buffer (reused from `CashflowIntelligence`).
+3. **Clustered Outflows**: Multiple significant commitments fall on the same day or close together.
+4. **Goal at Risk**: Business goal deadline approaching with insufficient progress (`BusinessGoalsEngine`).
+5. **Budget Exceeded**: Active spending category budget limit exceeded (`BudgetEngine`).
+
+Every pressure point includes structured explainable context:
+- `WHAT`: Qualitative description of the event
+- `WHY`: Root cause and financial impact explanation
+- `METRIC`: Quantitative financial parameters (e.g., `Projected cash: ₹X | Safety buffer: ₹Y`)
+
+### Action Center & Advisor Integration
+- **Action Center (Signal 10)**: Surfaces prioritized planning signals (`cash_planning_signals`) into `ActionCenterEngine` without duplicating existing readiness or scenario actions.
+- **Cashly Advisor (Rule 23 - Cash Planning Pressure Point)**: Triggers an explainable advisory card when a high-priority pressure point is detected in the 7-day planning horizon.
+
+---
+
+## 16. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -747,7 +806,7 @@ For each window, computes:
 
 ---
 
-## 16. Deployment (Vercel / Netlify)
+## 17. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -759,7 +818,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 17. Current Limitations
+## 18. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -769,6 +828,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 18. License
+## 19. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

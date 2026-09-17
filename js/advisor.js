@@ -261,7 +261,26 @@ const CashlyAdvisor = (() => {
      3. RECOMMENDATION RULES GENERATOR
      ---------------------------------------------------------- */
   function generate(summaryOverride = null, intelOverride = null, kpiOverride = null, calendarOverride = null) {
-    const s = summaryOverride || (
+    let opts = {};
+    let s = null;
+    let intel = null;
+    let kpi = kpiOverride;
+    let calendar = calendarOverride;
+    let customPayments = null;
+
+    if (summaryOverride && typeof summaryOverride === 'object' && ('summaryOverride' in summaryOverride || 'paymentsOverride' in summaryOverride || 'availableCash' in summaryOverride || 'commitmentsOverride' in summaryOverride)) {
+      opts = summaryOverride;
+      s = opts.summaryOverride || (opts.availableCash !== undefined ? opts : null);
+      intel = opts.intelOverride || intelOverride;
+      kpi = opts.kpiOverride || kpiOverride;
+      calendar = opts.calendarOverride || calendarOverride;
+      customPayments = opts.paymentsOverride || opts.commitmentsOverride || opts.commitments;
+    } else {
+      s = summaryOverride;
+      intel = intelOverride;
+    }
+
+    s = s || (
       (typeof AppState !== 'undefined' && typeof AppState.getSummary === 'function')
         ? AppState.getSummary()
         : {
@@ -276,19 +295,23 @@ const CashlyAdvisor = (() => {
         }
     );
 
-    const intel = intelOverride || (
+    intel = intel || (
       (typeof CashflowIntelligence !== 'undefined' && typeof CashflowIntelligence.compute === 'function')
-        ? CashflowIntelligence.compute()
+        ? CashflowIntelligence.compute({ summaryOverride: s, paymentsOverride: customPayments })
         : null
     );
 
-    const txns = (typeof AppState !== 'undefined' && typeof AppState.getTransactions === 'function')
-      ? AppState.getTransactions()
-      : [];
+    const txns = opts.transactionsOverride || (
+      (typeof AppState !== 'undefined' && typeof AppState.getTransactions === 'function')
+        ? AppState.getTransactions()
+        : []
+    );
 
-    const payments = (typeof AppState !== 'undefined' && typeof AppState.getPayments === 'function')
-      ? AppState.getPayments().filter(p => p.status !== 'paid')
-      : [];
+    const payments = customPayments || (
+      (typeof AppState !== 'undefined' && typeof AppState.getPayments === 'function')
+        ? AppState.getPayments().filter(p => p.status !== 'paid')
+        : []
+    );
 
     const spending = getSpendingInsights();
     const recs = [];
@@ -304,7 +327,7 @@ const CashlyAdvisor = (() => {
     const obligationReserve = intel ? intel.obligationReserve : Math.round(upcomingObligations * 0.6);
 
     // RULE 0: EMPTY / LOW DATA STATE
-    if (txns.length === 0) {
+    if (txns.length === 0 && !opts.paymentsOverride && !opts.summaryOverride) {
       recs.push({
         id: 'no_data_empty_state',
         type: 'empty',
@@ -691,7 +714,7 @@ const CashlyAdvisor = (() => {
     }
 
     // PHASE 14: BUSINESS PERFORMANCE & KPI RULES (Rules 15-18)
-    const kpi = kpiOverride || (
+    kpi = kpi || (
       (typeof KPIEngine !== 'undefined' && typeof KPIEngine.compute === 'function')
         ? KPIEngine.compute({ summaryOverride: s, transactionsOverride: txns })
         : null
@@ -887,6 +910,39 @@ const CashlyAdvisor = (() => {
       });
     }
 
+    // PHASE 18: BUSINESS CASH PLANNING & PRESSURE POINTS (Rule 23)
+    const planningEngine = (typeof CashPlanningEngine !== 'undefined')
+      ? CashPlanningEngine
+      : ((typeof window !== 'undefined' && window.CashPlanningEngine)
+          ? window.CashPlanningEngine
+          : ((typeof global !== 'undefined' && global.CashPlanningEngine) ? global.CashPlanningEngine : null));
+
+    if (planningEngine && typeof planningEngine.getPressurePoints === 'function') {
+      const planPressures = planningEngine.getPressurePoints({
+        horizonDays: 7,
+        referenceDate: opts.referenceDate,
+        summaryOverride: s,
+        paymentsOverride: payments,
+        transactionsOverride: txns,
+      });
+
+      if (planPressures && planPressures.length > 0) {
+        const topPressure = planPressures.find(p => p.severity === 'risk') || planPressures[0];
+        recs.push({
+          id: `cash_planning_pressure_${topPressure.id}`,
+          type: 'cash_planning_pressure',
+          priority: topPressure.severity === 'risk' ? 'high' : 'medium',
+          severity: topPressure.severity,
+          icon: topPressure.severity === 'risk' ? iconRisk() : iconCaution(),
+          title: 'Cashflow planning pressure expected',
+          message: topPressure.what,
+          reason: `${topPressure.why} ${topPressure.metric}`,
+          action: 'Audit upcoming outlays, delay non-essential stock purchases, and prioritize collection of receivables before this date.',
+          created_at: now,
+        });
+      }
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({
@@ -912,9 +968,9 @@ const CashlyAdvisor = (() => {
     return recs;
   }
 
-  function getRecommendations() {
-    if (_cachedRecommendations.length === 0 || Date.now() - _cachedTimestamp > 5000) {
-      return generate();
+  function getRecommendations(options) {
+    if (options || _cachedRecommendations.length === 0 || Date.now() - _cachedTimestamp > 5000) {
+      return generate(options);
     }
     return _cachedRecommendations;
   }

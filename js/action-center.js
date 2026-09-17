@@ -611,6 +611,41 @@ const ActionCenterEngine = (() => {
       }
     }
 
+    /* ----------------------------------------------------------
+       SIGNAL 10: CASH PLANNING SIGNALS (Phase 18)
+       ---------------------------------------------------------- */
+    let cashPlan = options.cashPlanOverride || null;
+    if (!cashPlan && typeof CashPlanningEngine !== 'undefined' && typeof CashPlanningEngine.getPlan === 'function') {
+      cashPlan = CashPlanningEngine.getPlan({
+        horizonDays: 7,
+        referenceDate: refDate,
+        summaryOverride: summary,
+        paymentsOverride: payments,
+        transactionsOverride: txns,
+      });
+    }
+
+    if (cashPlan && Array.isArray(cashPlan.pressurePoints)) {
+      cashPlan.pressurePoints.forEach(pp => {
+        if (pp.severity === 'risk' || pp.priority === 'critical' || pp.priority === 'high') {
+          const actionKey = `cash_plan_${pp.id}`;
+          addOrMergeCandidate(actionKey, {
+            id: `act_${actionKey}`,
+            type: 'forecast_risk',
+            priority: pp.priority || (pp.severity === 'risk' ? 'critical' : 'high'),
+            title: 'Cashflow plan pressure expected',
+            description: pp.what,
+            reason: pp.why,
+            metric: pp.metric,
+            source: 'forecast',
+            dueDate: pp.date || null,
+            amount: pp.amount || null,
+            status: 'active',
+          });
+        }
+      });
+    }
+
     // 5. Convert candidate map to array & apply deterministic sorting
     const allActions = Array.from(candidateMap.values());
 

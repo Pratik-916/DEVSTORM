@@ -36,7 +36,7 @@ const PaymentReadinessEngine = (() => {
     const effCash = options.availableCash !== undefined ? Math.max(0, Number(options.availableCash) || 0) : availableCash;
     if (typeof CashflowIntelligence !== 'undefined' && typeof CashflowIntelligence.compute === 'function') {
       const intelOpts = Object.assign({}, options, {
-        summaryOverride: Object.assign({ availableCash: effCash }, options.summaryOverride || {}),
+        summaryOverride: Object.assign({}, options.summaryOverride || {}, { availableCash: effCash }),
         paymentsOverride: options.paymentsOverride || options.commitmentsOverride || options.commitments,
       });
       const intel = CashflowIntelligence.compute(intelOpts);
