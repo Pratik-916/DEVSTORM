@@ -46,6 +46,9 @@ const Router = (() => {
       } else if (typeof Dashboard !== 'undefined') {
         Dashboard.renderSummary();
       }
+      if (typeof ActionCenterEngine !== 'undefined' && typeof ActionCenterEngine.render === 'function') {
+        ActionCenterEngine.render('dashboard-action-center-container');
+      }
     }
 
     if (page === 'transactions' && typeof Transactions !== 'undefined') {

@@ -173,6 +173,11 @@ const Dashboard = (() => {
 
     // Update dynamic forecast chart & note
     updateChart();
+
+    // Render Phase 16 Action Center
+    if (typeof ActionCenterEngine !== 'undefined' && typeof ActionCenterEngine.render === 'function') {
+      ActionCenterEngine.render('dashboard-action-center-container');
+    }
   }
 
   /**

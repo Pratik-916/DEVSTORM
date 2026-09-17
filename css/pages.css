@@ -523,3 +523,30 @@
     text-align: center;
   }
 }
+
+/* ============================================================
+   PHASE 16: CASHFLOW ACTION CENTER
+   ============================================================ */
+.action-card {
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+
+.action-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-action-dismiss {
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.btn-action-dismiss:hover {
+  background: var(--c-bg-subtle, #f1f5f9) !important;
+  color: var(--c-danger, #ef4444) !important;
+}
+
+@media (max-width: 600px) {
+  .action-card {
+    padding: var(--sp-3) !important;
+  }
+}
+

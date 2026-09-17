@@ -577,7 +577,88 @@ Phase 15 adds three explainable intelligence rules to `CashlyAdvisor`:
 
 ---
 
-## 13. Local Development Setup
+## 13. Phase 16: Cashflow Action Center
+
+Phase 16 introduces the **Cashflow Action Center** (`js/action-center.js`), a consolidated, vendor-focused orchestration layer answering the core operational question:
+> *"What needs my attention right now?"*
+
+The Action Center synthesizes signals across Cash Health, Safe to Spend, Cashflow Calendar, Pending Settlements, Upcoming Obligations, Budgets, Goals, Recurring Patterns, KPI Performance, and Cashly Advisor recommendations into a clean, prioritized, actionable dashboard interface.
+
+### Architectural Principles & Read-Only Guarantees
+- **Pure Visibility & Orchestration Layer**: `ActionCenterEngine` does not perform independent financial calculations or establish a secondary financial ledger. It consumes existing, verified engine outputs.
+- **Strict Read-Only Guarantee**: Zero database writes, zero financial mutations. It never creates, edits, or deletes transactions, obligations, budgets, or goals.
+- **Zero AI Dependencies & Deterministic**: Rule-based normalization and deterministic prioritization; no subjective AI scoring, external APIs, or secret keys.
+- **Tenant Isolation**: Operates strictly within authenticated business context, preserving existing RLS and data isolation boundaries.
+
+### Critical Financial Invariants
+> [!IMPORTANT]
+> - **Pending Money is NOT Available Cash**: Pending digital settlements awaiting bank clearance are surfaced as expected incoming events, but are **never added to Available Cash**. Wording explicitly clarifies: *"₹X is pending settlement and has not yet cleared into available cash."*
+> - **Expected Events are NOT Actual Transactions**: Forecasted commitments or pattern predictions are never converted into confirmed financial records.
+
+### Normalized Action Model
+All candidate signals are normalized into a uniform action schema:
+```javascript
+{
+  id: string,          // Deterministic unique ID (e.g., 'act_payment_p1', 'act_cash_pressure')
+  type: string,        // 'cash_pressure' | 'upcoming_payment' | 'pending_settlement' | 'budget_pressure' | 'goal_pressure' | 'sales_decline' | 'expense_increase' | 'recurring_anomaly' | 'forecast_risk'
+  priority: string,    // 'critical' | 'high' | 'medium' | 'low'
+  title: string,       // Concise merchant-facing title
+  description: string, // What is happening (prefixed with WHAT:)
+  reason: string,      // Why it matters to the business (prefixed with WHY:)
+  metric: string,      // Measurable numerical context (prefixed with METRIC:)
+  source: string,      // 'advisor' | 'calendar' | 'budget' | 'goal' | 'kpi' | 'pattern' | 'obligation'
+  dueDate: string|null,// 'YYYY-MM-DD' or null if unscheduled
+  amount: number|null, // Positive financial amount when applicable
+  status: string       // 'active' | 'informational'
+}
+```
+
+### Deterministic Priority Levels
+1. **`CRITICAL`**:
+   - Projected ending cash $\le 0$ or severe forecast cash deficit.
+   - Obligation due within 1–2 days where amount exceeds current Available Cash.
+   - Safe to Spend = 0 with an urgent obligation due soon.
+2. **`HIGH`**:
+   - Upcoming outgoing commitment $\ge 40\%$ of Available Cash.
+   - Exceeded budget (`percentage_used >= 100%`).
+   - Goal is at risk with deadline $\le 7$ days.
+   - Meaningful forecast cash pressure according to safety buffer thresholds.
+3. **`MEDIUM`**:
+   - Pending settlement dependency $\ge 50\%$ of obligations due within 3 days.
+   - Large pending settlement balance awaiting bank clearance.
+   - Budget caution ($\ge 80\%$ and $< 100\%$).
+   - Goal needing attention ($\le 14$ days, $< 50\%$ progress).
+   - Meaningful KPI deterioration (sales drop $\ge 15\%$, expense surge $\ge 20\%$, cash contraction $\ge 10\%$).
+   - Verified recurring expense anomaly.
+4. **`LOW`**:
+   - Genuine informational items only. If no conditions require attention, the clean factual empty state is displayed rather than creating artificial "healthy" cards.
+
+### Multi-Signal Deduplication Strategy
+Overlapping signals representing the same underlying financial event (e.g. an upcoming supplier payment that also appears in the calendar, triggers cash pressure, and touches a budget) are consolidated into a single primary action item using stable semantic identifiers (`payment_{id}`, `budget_{id}`, `goal_{id}`, `cash_pressure`). The consolidated item retains the highest priority, combines relevant metrics, and points out the complete financial impact.
+
+### Maximum 5 Actions & Deterministic Sorting
+The primary Action Center displays at most **5 active actions**:
+1. **Priority weight**: `critical` (4) $\rightarrow$ `high` (3) $\rightarrow$ `medium` (2) $\rightarrow$ `low` (1).
+2. **Due date proximity**: Earliest valid due date first (dated items precede undated items).
+3. **Financial impact**: Largest monetary amount first.
+
+### Temporary UI Dismissal & Critical Protection
+- Non-critical actions (High, Medium, Low) feature a dismiss button (`✕`) allowing vendors to temporarily clear cards for their current session.
+- **Critical Risk Protection**: Critical financial-risk actions cannot be dismissed, ensuring urgent liquidity shortfalls cannot be accidentally hidden.
+- Vendors can restore dismissed cards at any time using the "Restore Dismissed" button.
+- Zero database tables: dismissal state is stored in-memory and resets cleanly.
+
+### Empty State
+When all monitored cashflow conditions are within normal thresholds, Action Center renders a reassuring factual card:
+> *"No immediate cashflow actions. Current monitored cashflow conditions do not require immediate attention."*
+
+### Application Versioning
+- Application release upgraded from **v1.0** to **v1.1** (Phase 16 completed).
+- Service Worker offline cache updated from `cashly-cache-v5` to `cashly-cache-v6` with complete pre-caching of all engines (`kpi.js`, `cashflow-calendar.js`, `action-center.js`).
+
+---
+
+## 14. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -611,7 +692,7 @@ Phase 15 adds three explainable intelligence rules to `CashlyAdvisor`:
 
 ---
 
-## 14. Deployment (Vercel / Netlify)
+## 15. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -623,7 +704,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 15. Current Limitations
+## 16. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -633,6 +714,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 16. License
+## 17. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.
