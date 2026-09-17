@@ -1459,8 +1459,10 @@ const CashlyAdvisor = (() => {
       CashflowPatterns.render('insights-patterns-container');
     }
 
-    // 7. Render Cashflow Planner & What-If Scenarios (Phase 12)
-    if (typeof CashflowScenarioEngine !== 'undefined' && typeof CashflowScenarioEngine.render === 'function') {
+    // 7. Render Decision Workspace / What-If Scenarios (Phase 24 / Phase 12)
+    if (typeof DecisionWorkspaceEngine !== 'undefined' && typeof DecisionWorkspaceEngine.render === 'function') {
+      DecisionWorkspaceEngine.render('insights-scenarios-container');
+    } else if (typeof CashflowScenarioEngine !== 'undefined' && typeof CashflowScenarioEngine.render === 'function') {
       CashflowScenarioEngine.render('insights-scenarios-container');
     }
 

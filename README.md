@@ -1085,7 +1085,67 @@ Risk outlook across three horizons:
 
 ---
 
-## 21. Local Development Setup
+## 21. Cashly Decision Workspace & Scenario Simulator 2.0 (Phase 24)
+
+Phase 24 introduces the centralized, read-only `DecisionWorkspaceEngine` (`js/decision-workspace.js`), transforming Cashly's what-if modeling into a comprehensive decision sandbox for micro-merchants.
+
+### Key Architectural Principles
+
+1. **Strictly Hypothetical & Ephemeral**:
+   - The Decision Workspace is a read-only testing environment.
+   - Scenario results are **never** actual account balances and do not represent confirmed funds.
+   - All scenario computations remain completely in-memory and ephemeral.
+   - Zero database tables, zero Supabase writes, and zero localStorage persistence for hypothetical states.
+2. **Absolute Financial Invariance**:
+   - Running a scenario **NEVER** mutates `AppState`, transactions, settlement statuses, payment records, budgets, goals, Available Cash, or Safe to Spend.
+   - Authoritative engines (`CashflowEngine`, `CashPlanningEngine`, `PaymentReadinessEngine`, `RiskEngine`, `CollectionsEngine`, `BusinessGoalsEngine`, `BudgetEngine`) remain the sole source of truth.
+3. **Phase 12 Reuse & Orchestration**:
+   - `DecisionWorkspaceEngine` acts as an orchestration layer over `CashflowScenarioEngine` and authoritative engines rather than introducing a parallel calculation engine.
+   - Evaluates multi-engine impact across liquidity, payment readiness, risk profile, budgets, and goals.
+4. **No Persistent Alerts or Actions**:
+   - Simulations do not generate persistent alerts, push notifications, or Action Center cards.
+   - Real alerts and actions continue to reflect only the actual underlying financial state.
+5. **No "Apply Scenario" Mutation**:
+   - Scenarios provide contextual workflow bridges (e.g. *Go to Add Transaction*, *Schedule in Upcoming Payments*, *Collections Queue*) that navigate to authoritative Cashly workflows without ever auto-mutating financial state.
+
+### Supported Scenario Types
+
+| Scenario | Code | Existing Engines Reused | Description |
+|---|---|---|---|
+| **Purchase / Asset** | `PURCHASE` | `CashflowScenarioEngine`, `PaymentReadinessEngine`, `BudgetEngine`, `BusinessGoalsEngine`, `RiskEngine` | Simulates major equipment or inventory outlays against Safe to Spend and liquid reserves. |
+| **Sales Shift** | `SALES_CHANGE` | `CashflowScenarioEngine`, `CashflowIntelligence`, `CashPlanningEngine`, `RiskEngine` | Models revenue contraction (-50% to +50%) across forward cashflow trajectories. |
+| **Expense Shift** | `EXPENSE_CHANGE` | `CashflowScenarioEngine`, `CashflowIntelligence`, `CashPlanningEngine`, `RiskEngine` | Models operational cost inflation (-50% to +100%) against burn rate and runway. |
+| **Delayed Settlement** | `DELAYED_SETTLEMENT` | `CashflowScenarioEngine`, `CashflowCalendarEngine`, `RiskEngine` | Evaluates liquidity buffers if pending digital settlements are delayed by 1–14 days. |
+| **Collect Receivables** | `COLLECT_RECEIVABLES` | `CollectionsEngine`, `CashflowScenarioEngine`, `RiskEngine` | Models immediate clearance of selected pending digital transactions into liquid cash. |
+| **Upcoming Payment** | `UPCOMING_COMMITMENT` | `PaymentReadinessEngine`, `CashPlanningEngine`, `CashflowCalendarEngine`, `RiskEngine` | Tests affordability, reserve impact, and coverage for a prospective future obligation. |
+
+### Normalized Before / After / Change Model
+
+Every simulation evaluates outcomes across a standardized comparison model:
+- **Baseline (Current)**: Authoritative metrics from confirmed financial state. Baseline values never use strikethroughs.
+- **Scenario (Hypothetical)**: Simulated metrics clearly tagged with prominent `HYPOTHETICAL` labels.
+- **Net Impact (Delta)**: Direct numerical difference highlighting net change in liquid reserves.
+
+### Risk Integration
+
+- Scenario risk transitions are evaluated by feeding hypothetical state through the authoritative Phase 23 `RiskEngine`.
+- Displays real-time risk transitions across standardized states: `HEALTHY` $\rightarrow$ `WATCH` $\rightarrow$ `ELEVATED` $\rightarrow$ `CRITICAL`.
+- If scenario risk cannot be safely evaluated, it is reported as unavailable rather than fabricated.
+
+### Factual WHAT / WHY / HOW Explanations
+
+Every simulation provides clear consequence explanations:
+- **WHAT**: Direct factual impact on Available Cash and Safe to Spend.
+- **WHY**: The specific reserve requirement, budget threshold, or obligation coverage driving the outcome.
+- **HOW**: Recommended operational next step (e.g. deferral, collection follow-up, or safe execution via Cash Planning).
+
+### Application Versioning
+- Application release upgraded from **v1.8** to **v1.9** (Phase 24 completed).
+- Service Worker offline cache updated from `cashly-cache-v13` to `cashly-cache-v14` with pre-caching of `js/decision-workspace.js`.
+
+---
+
+## 22. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -1119,7 +1179,7 @@ Risk outlook across three horizons:
 
 ---
 
-## 22. Deployment (Vercel / Netlify)
+## 23. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -1131,7 +1191,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 23. Current Limitations
+## 24. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -1141,6 +1201,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 24. License
+## 25. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

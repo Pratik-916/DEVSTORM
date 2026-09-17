@@ -88,6 +88,9 @@ const Router = (() => {
       if (typeof Advisor !== 'undefined') {
         Advisor.render();
       }
+      if (typeof DecisionWorkspaceEngine !== 'undefined' && typeof DecisionWorkspaceEngine.render === 'function') {
+        DecisionWorkspaceEngine.render('insights-scenarios-container');
+      }
     }
 
     if (page === 'admin' && typeof Admin !== 'undefined') {

@@ -473,6 +473,9 @@ const AppState = (() => {
     if (typeof RiskEngine !== 'undefined' && typeof RiskEngine.render === 'function') {
       RiskEngine.render('insights-risk-container');
     }
+    if (typeof DecisionWorkspaceEngine !== 'undefined' && typeof DecisionWorkspaceEngine.render === 'function') {
+      DecisionWorkspaceEngine.render('insights-scenarios-container');
+    }
   }
 
   /* ---- Financial Accounts ---- */
