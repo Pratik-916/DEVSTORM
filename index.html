@@ -219,7 +219,7 @@
 
       <!-- Footer -->
       <div class="sidebar-footer">
-        <p class="sidebar-footer-text">Cashly v1.6 &bull; Demo Mode</p>
+        <p class="sidebar-footer-text">Cashly v1.8 &bull; Demo Mode</p>
       </div>
     </aside>
 
@@ -542,7 +542,7 @@
               <div class="cash-position-main">
                 <p class="cash-pos-label">Available Cash</p>
                 <div class="cash-pos-amount" id="metric-cash-pos-amount">&#8377;8,250</div>
-                <div class="cash-pos-status">
+                <div class="cash-pos-status" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                   <span id="cash-health-badge" class="badge badge-caution" aria-label="Cash health: Caution">
                     <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
@@ -553,6 +553,8 @@
                     </svg>
                     Caution
                   </span>
+                  <!-- Cashflow Risk Indicator (Phase 23) -->
+                  <div id="dashboard-risk-indicator" style="display:inline-flex;"></div>
                 </div>
                 <p class="cash-pos-message" id="cash-pos-message">Your upcoming payments are getting close to your
                   available cash.</p>
@@ -1020,6 +1022,11 @@
             <!-- Dynamically populated by CollectionsEngine.render() -->
           </div>
 
+          <!-- Cashflow Risk & Early Warning System (Phase 23) -->
+          <div id="insights-risk-container" style="margin-bottom:var(--sp-6);">
+            <!-- Dynamically populated by RiskEngine.render() -->
+          </div>
+
           <!-- Business Cash Planning & Cashflow Plan (Phase 18) -->
           <div id="insights-cash-planning-container" style="margin-bottom:var(--sp-6);">
             <!-- Dynamically populated by CashPlanningEngine.render() -->
@@ -1347,7 +1354,7 @@
                 </div>
                 <div>
                   <p class="settings-row-label">Version</p>
-                  <p class="settings-row-desc">Cashly Demo v1.7</p>
+                  <p class="settings-row-desc">Cashly Demo v1.8</p>
                 </div>
               </div>
             </div>
@@ -2217,6 +2224,8 @@
   <script src="js/settlement.js"></script>
   <!-- Receivables & Collections Intelligence Engine (Phase 22) -->
   <script src="js/collections.js"></script>
+  <!-- Cashflow Risk & Early Warning System Engine (Phase 23) -->
+  <script src="js/risk.js"></script>
   <script src="js/router.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/transactions.js"></script>

@@ -822,6 +822,45 @@ const ActionCenterEngine = (() => {
       }
     }
 
+    /* ----------------------------------------------------------
+       SIGNAL 15: CONSOLIDATED CASHFLOW RISK EARLY WARNING (Phase 23)
+       Consolidates overall risk state into a single executive card
+       when risk is CRITICAL or ELEVATED (or WATCH if no other action exists).
+       Deduplicates deterministically under 'consolidated_risk_status'.
+       ---------------------------------------------------------- */
+    let riskEngine = options.riskEngineOverride || (typeof RiskEngine !== 'undefined'
+      ? RiskEngine
+      : ((typeof window !== 'undefined' && window.RiskEngine)
+          ? window.RiskEngine
+          : ((typeof global !== 'undefined' && global.RiskEngine) ? global.RiskEngine : null)));
+
+    if (riskEngine && typeof riskEngine.compute === 'function' && !options.skipRiskSignal) {
+      const riskData = riskEngine.compute({
+        referenceDate: refDate,
+        summaryOverride: summary,
+        transactionsOverride: txns,
+        paymentsOverride: payments,
+      });
+
+      if (riskData && (riskData.isCritical || riskData.isElevated || (riskData.isWatch && candidateMap.size === 0)) && riskData.primaryRisk) {
+        const pr = riskData.primaryRisk;
+        const actionKey = 'consolidated_risk_status';
+        addOrMergeCandidate(actionKey, {
+          id: 'act_consolidated_risk_status',
+          type: 'forecast_risk',
+          priority: riskData.isCritical ? 'critical' : (riskData.isElevated ? 'high' : 'medium'),
+          title: `Cashflow Risk: ${riskData.level} — ${pr.title}`,
+          description: `WHAT: ${pr.description}`,
+          reason: `WHY: ${pr.reason} HOW: ${pr.how}`,
+          metric: `METRIC: Risk State = ${riskData.level} | Primary: ${pr.title} | ${pr.metric || ''}`,
+          source: 'risk_engine',
+          dueDate: pr.dueDate || null,
+          amount: pr.amount || null,
+          status: 'active',
+        });
+      }
+    }
+
     // 5. Convert candidate map to array & apply deterministic sorting
     const allActions = Array.from(candidateMap.values());
 

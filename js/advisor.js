@@ -283,6 +283,13 @@ const CashlyAdvisor = (() => {
 
     if (optionsOverride && typeof optionsOverride === 'object') {
       Object.assign(opts, optionsOverride);
+      if (opts.paymentsOverride || opts.commitmentsOverride || opts.commitments) {
+        customPayments = opts.paymentsOverride || opts.commitmentsOverride || opts.commitments;
+      }
+      if (opts.intelOverride) intel = opts.intelOverride;
+      if (opts.kpiOverride) kpi = opts.kpiOverride;
+      if (opts.calendarOverride) calendar = opts.calendarOverride;
+      if (opts.summaryOverride) s = opts.summaryOverride;
     }
 
     s = s || (
@@ -1106,6 +1113,43 @@ const CashlyAdvisor = (() => {
             message: `${collSummary.delayedCount} digital receivable(s) totaling ${fmt(collSummary.delayedAmount)} have been pending for 3–5 days without confirmed settlement.`,
             reason: `WHAT: ${collSummary.delayedCount} digital sale(s) totaling ${fmt(collSummary.delayedAmount)} are in the delayed window (3–5 days) and remain excluded from Available Cash. WHY: Extended pending periods reduce cash visibility and can mask a tighter-than-expected Available Cash position. HOW: Cross-check your gateway or bank statement. If funds are received, confirm via Reconcile Settlements. Cashly does not guarantee payment arrival.`,
             action: 'Monitor gateway payouts. Reconcile any confirmed deposits in Cashly\'s settlement workflow.',
+            created_at: now,
+          });
+        }
+      }
+    }
+
+    // PHASE 23: CASHFLOW RISK & EARLY WARNING GUIDANCE (Rule 28)
+    {
+      let riskEngine = (typeof RiskEngine !== 'undefined')
+        ? RiskEngine
+        : ((typeof window !== 'undefined' && window.RiskEngine) ? window.RiskEngine : null);
+
+      if (!riskEngine && typeof require !== 'undefined') {
+        try { riskEngine = require('./risk.js').RiskEngine; } catch (e) {}
+      }
+
+      if (riskEngine && typeof riskEngine.compute === 'function' && !opts.skipRiskRule) {
+        const riskData = riskEngine.compute({
+          referenceDate: opts.referenceDate,
+          summaryOverride: s,
+          transactionsOverride: txns,
+          paymentsOverride: payments,
+        });
+
+        if (riskData && (riskData.isCritical || riskData.isElevated) && riskData.primaryRisk) {
+          const pr = riskData.primaryRisk;
+          const isCrit = riskData.isCritical;
+          recs.push({
+            id: 'cashflow_risk_guidance',
+            type: 'cashflow_risk',
+            priority: isCrit ? 'high' : 'medium',
+            severity: isCrit ? 'risk' : 'caution',
+            icon: isCrit ? iconRisk() : iconCaution(),
+            title: `Cashflow Risk: ${riskData.level} — ${pr.title}`,
+            message: `Consolidated intelligence indicates ${riskData.level.toLowerCase()} cashflow risk across operating commitments and reserves.`,
+            reason: `WHAT: ${pr.description} WHY: ${pr.reason} HOW: ${pr.how}`,
+            action: 'Review Cash Planning and Collections to monitor projected ending cash and clearance timelines. Cashly does not guarantee payment arrival.',
             created_at: now,
           });
         }

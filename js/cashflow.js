@@ -47,10 +47,10 @@ const CashflowIntelligence = (() => {
     }
 
     const windowDays = opts.windowDays || 7;
-    const summary = opts.summaryOverride || (typeof AppState !== 'undefined' ? AppState.getSummary() : {});
-    const transactions = opts.transactionsOverride || (typeof AppState !== 'undefined' ? AppState.getTransactions() : []);
-    const rawPayments = opts.paymentsOverride || (typeof AppState !== 'undefined' ? AppState.getPayments() : []);
-    const payments = rawPayments.filter(p => p.status !== 'paid');
+    const summary = opts.summaryOverride || (typeof AppState !== 'undefined' && typeof AppState.getSummary === 'function' ? AppState.getSummary() : {});
+    const transactions = opts.transactionsOverride || (typeof AppState !== 'undefined' && typeof AppState.getTransactions === 'function' ? AppState.getTransactions() : []);
+    const rawPayments = opts.paymentsOverride || (typeof AppState !== 'undefined' && typeof AppState.getPayments === 'function' ? AppState.getPayments() : []);
+    const payments = Array.isArray(rawPayments) ? rawPayments.filter(p => p.status !== 'paid') : [];
 
     const {
       availableCash = 0,

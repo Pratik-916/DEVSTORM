@@ -470,6 +470,9 @@ const AppState = (() => {
     if (typeof CollectionsEngine !== 'undefined' && typeof CollectionsEngine.render === 'function') {
       CollectionsEngine.render('insights-collections-container');
     }
+    if (typeof RiskEngine !== 'undefined' && typeof RiskEngine.render === 'function') {
+      RiskEngine.render('insights-risk-container');
+    }
   }
 
   /* ---- Financial Accounts ---- */

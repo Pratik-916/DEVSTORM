@@ -1020,7 +1020,72 @@ No new dismissal system. Uses existing Action Center: priority system, deduplica
 
 ---
 
-## 20. Local Development Setup
+## 20. Cashflow Risk & Early Warning System (Phase 23)
+
+Phase 23 introduces the centralized, read-only `RiskEngine` (`js/risk.js`) which acts as an aggregation and interpretation layer across all existing Cashly intelligence engines.
+
+### Key Architectural Principles
+
+1. **Deterministic & Explainable**:
+   - 100% deterministic rule-based evaluation.
+   - Zero external AI, probabilistic models, or black-box classifiers.
+2. **Aggregator & Interpreter Layer**:
+   - RiskEngine does **NOT** independently recalculate financial balances, run a separate cashflow forecast, or generate parallel recurring patterns.
+   - Strictly consumes authoritative outputs from:
+     - `CashflowEngine` & `CashflowIntelligence` (`Available Cash`, `Safe to Spend`)
+     - `CashflowCalendarEngine` (timelines, events, projected balances)
+     - `CashPlanningEngine` (pressure points, runway, reserves)
+     - `PaymentReadinessEngine` (obligation coverage, reserve shortfalls)
+     - `CashflowMitigationEngine` (actionable recovery strategies)
+     - `CashflowStatementEngine` (financial health audit score & pillar drags)
+     - `KPIEngine` (sales contraction, expense surge, net cashflow)
+     - `CollectionsEngine` (receivables aging & delayed/overdue queue)
+     - `SettlementReconciliationEngine` (settlement aging)
+     - `BusinessGoalsEngine` & `BudgetEngine` (goal shortfall & budget overages)
+3. **Strict Financial Invariance (Zero Financial Mutation)**:
+   - RiskEngine NEVER modifies Available Cash, Safe to Spend, transaction dates, amounts, settlements, budgets, or obligations.
+   - Existing engines remain the single source of truth.
+4. **No New Arbitrary Thresholds**:
+   - Consumes existing signals without fabricating ad-hoc percentages or arbitrary rupee limits.
+5. **Clear Non-Financial Disclaimers**:
+   - Cashly's risk states (`HEALTHY`, `WATCH`, `ELEVATED`, `CRITICAL`) are internal operational cashflow indicators only.
+   - They are **NOT** credit scores, bank ratings, official accounting classifications, insolvency predictions, or solvency guarantees.
+
+### Internal Risk States
+
+| Risk State | Meaning | Signal Criteria |
+|---|---|---|
+| **CRITICAL** | Urgent cashflow vulnerability detected | Active critical signal (e.g. projected cash deficit, uncovered essential payment, severe reserve shortfall) |
+| **ELEVATED** | Noticeable cashflow pressure requiring response | Active high-severity risk (e.g. overdue receivables, breached safety buffer, budget exceeded) |
+| **WATCH** | Early operational warning | Active medium-severity signal (e.g. delayed settlements, KPI sales drop, goal attention) |
+| **HEALTHY** | Stable operating position | No meaningful active risk signals; comfortable liquidity buffer |
+
+### WHAT / WHY / HOW Framework
+
+Every risk surfaced in the Risk Engine is structured for merchant clarity:
+- **WHAT**: Concrete description of what is occurring.
+- **WHY**: Which specific Cashly signal or metric created the warning.
+- **HOW**: The direct Cashly workflow (Cash Planning, Collections, Reconcile Settlements, Payment Readiness, Mitigation Playbook) to investigate or resolve it.
+
+### Multi-Horizon Outlook
+
+Risk outlook across three horizons:
+- **7-Day Outlook**: Immediate commitments and near-term liquid buffer.
+- **14-Day Outlook**: Medium-term obligation pressure and runway stability.
+- **30-Day Outlook**: Long-term monthly budget, goal alignment, and baseline trends.
+
+### Action Center & Advisor Integration
+
+- **Action Center Signal 15 (`consolidated_risk_status`)**: Adds a single executive risk summary card when overall risk is meaningful and not already represented by individual action cards. Deduplicated deterministically; critical protection applies.
+- **Advisor Rule 28 (`cashflow_risk_guidance`)**: Provides contextual risk coaching with clear disclaimers that payment arrival or revenue cannot be guaranteed.
+
+### Application Versioning
+- Application release upgraded from **v1.7** to **v1.8** (Phase 23 completed).
+- Service Worker offline cache updated from `cashly-cache-v12` to `cashly-cache-v13` with full offline support for `js/risk.js`.
+
+---
+
+## 21. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -1054,7 +1119,7 @@ No new dismissal system. Uses existing Action Center: priority system, deduplica
 
 ---
 
-## 20. Deployment (Vercel / Netlify)
+## 22. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -1066,7 +1131,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 21. Current Limitations
+## 23. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -1076,6 +1141,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 22. License
+## 24. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.
