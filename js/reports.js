@@ -262,6 +262,9 @@ const Reports = (() => {
   function renderMetricsFull() {
     renderMetrics();
     renderIntelligenceMetrics();
+    if (typeof CashflowStatementEngine !== 'undefined' && typeof CashflowStatementEngine.render === 'function') {
+      CashflowStatementEngine.render('reports-statement-container');
+    }
   }
 
   return { initChart, init30DayChart, renderMetrics: renderMetricsFull };

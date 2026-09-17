@@ -3,6 +3,72 @@
    ============================================== */
 
 /* ==============================================
+   PRINT STYLESHEET — PRINTABLE BUSINESS CASHFLOW STATEMENT
+   ============================================== */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+  }
+
+  .sidebar,
+  .mobile-nav,
+  .no-print,
+  #btn-view-insights,
+  .btn,
+  .filter-tabs,
+  .page-header-row button,
+  .dashboard-main-grid,
+  .advisor-section,
+  #dashboard-action-center-container,
+  #page-dashboard,
+  #page-transactions,
+  #page-payments,
+  #page-insights,
+  #page-settings,
+  #page-admin {
+    display: none !important;
+  }
+
+  .app-shell,
+  .main-content,
+  .page-content,
+  #page-reports,
+  .statement-exportable-root {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .reports-summary-grid,
+  .reports-chart-card,
+  #forecast-30d-chart,
+  .forecast-note,
+  #page-reports > .card {
+    display: none !important;
+  }
+
+  table {
+    page-break-inside: avoid;
+    width: 100% !important;
+    color: #000000 !important;
+  }
+
+  table tr td {
+    border-color: #cccccc !important;
+  }
+}
+
+/* ==============================================
    CARD
    ============================================== */
 .card {

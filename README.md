@@ -824,7 +824,52 @@ Simulates the operational impact of applying each lever, producing:
 
 ---
 
-## 17. Local Development Setup
+## 17. Cashflow Statement & Financial Health Audit (Phase 20)
+
+Phase 20 introduces a deterministic, explainable reporting and decision-support layer (`CashflowStatementEngine` in [`js/statement.js`](file:///d:/Projects/DEVSTORM/js/statement.js)) giving micro-merchants an auditable Direct Cashflow Statement, cash reconciliation to the rupee, and a multi-dimensional Financial Health Scorecard.
+
+> [!IMPORTANT]
+> **Decision-Support Reporting Boundary**: The Cashflow Statement and Financial Health Audit are internal Cashly decision-support indicators based on recorded transactions and commitments. They do not constitute double-entry accounting, a balance sheet, a tax filing, an official bank statement, or an official credit rating.
+
+### Core Objectives
+Answers five fundamental merchant questions:
+1. *"Where did actual cash come from?"*
+2. *"Where did actual cash go?"*
+3. *"Did the cash movement reconcile with Cashly's authoritative liquid balance?"*
+4. *"What is Cashly's current internal financial-health indicator?"*
+5. *"Why did the score change and what can improve it?"*
+
+### Architecture & Financial Invariants
+- **100% Read-Only**: Zero database mutations, zero Supabase writes, zero `localStorage` state persistence.
+- **Strict Settlement Invariant**: Only confirmed settled customer receipts count as operating cash inflows. Pending digital sales are strictly excluded and reported in a separate footnote.
+- **Reconciliation to Rupee**: Reconciles opening liquid cash, net operating cashflow, and net financing/owner movements against `Available Cash` down to the rupee:
+  $$\text{Opening Liquid Cash} + \text{Net Operating Cashflow} + \text{Net Financing Movement} = \text{Closing Liquid Cash}$$
+
+### Financial Health Audit Score (0–100 Scorecard)
+Evaluates five transparent, deterministic pillars (0–20 points each, strictly clamped to $[0, 20]$):
+1. **Liquidity Buffer (0–20 pts)**: Ratio of Safe to Spend against the verified Safety Buffer from `CashflowIntelligence`.
+2. **Runway & Burn Safety (0–20 pts)**: Operational survival days before reaching minimum safe operating floors.
+3. **Settlement Efficiency (0–20 pts)**: Turnaround and ratio of pending digital receivables awaiting bank clearance.
+4. **Payment Reliability (0–20 pts)**: Percentage of active payment commitments categorized as `READY` vs `NOT COVERED` (`PaymentReadinessEngine`).
+5. **Spending Discipline (0–20 pts)**: Adherence to active spending category budgets without overruns (`BudgetEngine`).
+
+### Internal Presentation Grade Bands
+- **Grade A (85–100)**: Excellent Financial Health
+- **Grade B (70–84)**: Stable & Manageable
+- **Grade C (50–69)**: Cautionary — Requires Attention
+- **Grade D (< 50)**: Critical Risk — Immediate Action Required
+
+### Export & Print Features
+- **Client-Side CSV Export**: Generates Excel-compatible `Cashly_Cashflow_Statement_[Period].csv` with built-in formula-injection protection (sanitizing `=`, `+`, `-`, `@` while preserving legitimate negative monetary values).
+- **Printable Business Cashflow Statement**: Dedicated `@media print` layout formatting a formal, monochrome-friendly statement ready for review.
+
+### Action Center & Advisor Integration
+- **Action Center (Signal 12 - `health_audit_signals`)**: Surfaces prioritized action cards when the health audit detects Grade D or high liquidity vulnerability.
+- **Cashly Advisor (Rule 25 - `financial_health_audit`)**: Recommends specific operational improvements based on the lowest-scoring health audit pillar.
+
+---
+
+## 18. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -858,7 +903,7 @@ Simulates the operational impact of applying each lever, producing:
 
 ---
 
-## 18. Deployment (Vercel / Netlify)
+## 19. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -870,7 +915,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 19. Current Limitations
+## 20. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -880,6 +925,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 20. License
+## 21. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

@@ -683,6 +683,36 @@ const ActionCenterEngine = (() => {
       });
     }
 
+    /* ----------------------------------------------------------
+       SIGNAL 12: FINANCIAL HEALTH AUDIT SIGNALS (Phase 20)
+       ---------------------------------------------------------- */
+    let healthAudit = options.healthAuditOverride || null;
+    if (!healthAudit && typeof CashflowStatementEngine !== 'undefined' && typeof CashflowStatementEngine.computeHealthAudit === 'function') {
+      healthAudit = CashflowStatementEngine.computeHealthAudit({
+        summaryOverride: summary,
+        paymentsOverride: payments,
+        transactionsOverride: txns,
+      });
+    }
+
+    if (healthAudit && (healthAudit.grade === 'D' || healthAudit.totalScore < 60)) {
+      const lowPillar = healthAudit.lowestPillar;
+      const actionKey = `health_audit_${lowPillar ? lowPillar.id : 'score'}`;
+      addOrMergeCandidate(actionKey, {
+        id: `act_${actionKey}`,
+        type: 'cash_pressure',
+        priority: healthAudit.grade === 'D' ? 'critical' : 'high',
+        title: `Financial Health Audit: Grade ${healthAudit.grade} (${healthAudit.totalScore}/100)`,
+        description: `WHAT: Cashly's internal health audit indicates ${healthAudit.gradeLabel.toLowerCase()}.`,
+        reason: `WHY: Primary drag: ${lowPillar ? lowPillar.title : 'Liquidity'}. ${lowPillar ? lowPillar.why : ''}`,
+        metric: `METRIC: Health score = ${healthAudit.totalScore}/100 | ${lowPillar ? lowPillar.title : 'Pillar'} = ${lowPillar ? lowPillar.score : 0}/20`,
+        source: 'audit',
+        dueDate: null,
+        amount: null,
+        status: 'active',
+      });
+    }
+
     // 5. Convert candidate map to array & apply deterministic sorting
     const allActions = Array.from(candidateMap.values());
 

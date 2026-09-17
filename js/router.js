@@ -64,6 +64,9 @@ const Router = (() => {
         Reports.renderMetrics();
         Reports.init30DayChart();
       }
+      if (typeof CashflowStatementEngine !== 'undefined' && typeof CashflowStatementEngine.render === 'function') {
+        CashflowStatementEngine.render('reports-statement-container');
+      }
     }
 
     if (page === 'insights') {

@@ -979,6 +979,44 @@ const CashlyAdvisor = (() => {
       }
     }
 
+    // PHASE 20: FINANCIAL HEALTH AUDIT (Rule 25)
+    let statementEngine = (typeof CashflowStatementEngine !== 'undefined')
+      ? CashflowStatementEngine
+      : ((typeof window !== 'undefined' && window.CashflowStatementEngine)
+          ? window.CashflowStatementEngine
+          : ((typeof global !== 'undefined' && global.CashflowStatementEngine) ? global.CashflowStatementEngine : null));
+
+    if (!statementEngine && typeof require !== 'undefined') {
+      try {
+        statementEngine = require('./statement.js').CashflowStatementEngine;
+      } catch (e) {}
+    }
+
+    if (statementEngine && typeof statementEngine.computeHealthAudit === 'function') {
+      const auditResult = statementEngine.computeHealthAudit({
+        summaryOverride: s,
+        paymentsOverride: payments,
+        transactionsOverride: txns,
+      });
+
+      if (auditResult && auditResult.lowestPillar && (auditResult.grade === 'C' || auditResult.grade === 'D' || auditResult.totalScore < 75)) {
+        const lp = auditResult.lowestPillar;
+        const isCritical = auditResult.grade === 'D';
+        recs.push({
+          id: 'financial_health_audit_guidance',
+          type: 'health_audit',
+          priority: isCritical ? 'high' : 'medium',
+          severity: isCritical ? 'risk' : 'caution',
+          icon: isCritical ? iconRisk() : iconCaution(),
+          title: `Health Audit: ${lp.title} needs attention (${auditResult.totalScore}/100)`,
+          message: `Cashly's internal health audit evaluated your business at Grade ${auditResult.grade} (${auditResult.totalScore}/100).`,
+          reason: `What happened: ${lp.title} scored ${lp.score}/20. Why it matters: ${lp.why} Metric/Event: Total score = ${auditResult.totalScore}/100 | ${lp.title} = ${lp.score}/20.`,
+          action: lp.how || 'Review your Direct Cashflow Statement and focus on the lowest-scoring health pillar.',
+          created_at: now,
+        });
+      }
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({
