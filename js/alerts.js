@@ -48,6 +48,8 @@ const AlertEngine = (() => {
     BUDGET_WARNING:            'budget_warning',
     GOAL_DEADLINE_RISK:        'goal_deadline_risk',
     CASH_TARGET_RISK:          'cash_target_risk',
+    // Phase 15: Cashflow Calendar
+    CALENDAR_OBLIGATION_EXCEEDS_CASH: 'calendar_obligation_exceeds_cash',
   };
 
   /* ============================================================
@@ -317,6 +319,31 @@ const AlertEngine = (() => {
           }
         }
       });
+    }
+
+    /* ---- Rule 14 (Phase 15): Upcoming Commitment Exceeds Available Cash in Next 3 Days ---- */
+    const threeDaysMs = today.getTime() + (3 * 86400000);
+
+    const nearTermObligationsTotal = payments
+      .filter(p => {
+        if (p.status === 'paid') return false;
+        const dueStr = p.dueDate || p.due_date;
+        if (!dueStr) return false;
+        const dueTime = new Date(dueStr).getTime();
+        return dueTime >= today.getTime() && dueTime <= threeDaysMs;
+      })
+      .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+
+    const availCash = Number(summary.availableCash) || 0;
+    if (nearTermObligationsTotal > availCash && nearTermObligationsTotal > 0) {
+      if (!_isDuplicate(TYPES.CALENDAR_OBLIGATION_EXCEEDS_CASH)) {
+        triggered.push({
+          type: TYPES.CALENDAR_OBLIGATION_EXCEEDS_CASH,
+          severity: 'risk',
+          title: 'Upcoming payments exceed available cash',
+          message: `${fmt(nearTermObligationsTotal)} in scheduled payments due in the next 3 days exceeds your current available cash of ${fmt(availCash)}. Prioritize essential payments immediately.`,
+        });
+      }
     }
 
     return triggered;
@@ -604,6 +631,7 @@ const AlertEngine = (() => {
   }
 
   return {
+    TYPES,
     evaluate,
     getAlerts,
     markRead,

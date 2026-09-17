@@ -260,7 +260,7 @@ const CashlyAdvisor = (() => {
   /* ----------------------------------------------------------
      3. RECOMMENDATION RULES GENERATOR
      ---------------------------------------------------------- */
-  function generate(summaryOverride = null, intelOverride = null, kpiOverride = null) {
+  function generate(summaryOverride = null, intelOverride = null, kpiOverride = null, calendarOverride = null) {
     const s = summaryOverride || (
       (typeof AppState !== 'undefined' && typeof AppState.getSummary === 'function')
         ? AppState.getSummary()
@@ -766,6 +766,95 @@ const CashlyAdvisor = (() => {
           message: `${exceededBudgets} budget${exceededBudgets === 1 ? '' : 's'} exceeded and ${atRiskGoals} goal${atRiskGoals === 1 ? '' : 's'} at risk.`,
           reason: `What happened: Multiple financial controls breached thresholds (${exceededBudgets} exceeded budgets, ${atRiskGoals} at-risk goals). Why it matters: Compounding variances threaten overall business stability and cash runways. Metric: Exceeded budgets = ${exceededBudgets}, At-risk goals = ${atRiskGoals}.`,
           action: 'Pause discretionary spending in exceeded budget categories and adjust goal contribution schedules.',
+          created_at: now,
+        });
+      }
+    }
+
+    // PHASE 15: CASHFLOW CALENDAR RULES (Rules 19–21)
+    const calendarData = calendarOverride || (
+      (typeof CashflowCalendarEngine !== 'undefined' && typeof CashflowCalendarEngine.compute === 'function')
+        ? CashflowCalendarEngine.compute({ summaryOverride: s, transactionsOverride: txns, paymentsOverride: payments })
+        : null
+    );
+
+    if (calendarData) {
+      // RULE 19: UPCOMING CASH PRESSURE (Forecast drops below safety floor)
+      const safeFloor = Math.max(500, Math.round(availableCash * 0.10));
+      if (Array.isArray(calendarData.timeline)) {
+        const pressureDay = calendarData.timeline.find(d => d.projectedEndingCash <= safeFloor);
+        if (pressureDay) {
+          const isCritical = pressureDay.projectedEndingCash <= 0;
+          recs.push({
+            id: 'calendar_cash_pressure',
+            type: 'upcoming_cash_pressure',
+            priority: isCritical ? 'high' : 'medium',
+            severity: isCritical ? 'risk' : 'caution',
+            icon: isCritical ? iconRisk() : iconCaution(),
+            title: 'Upcoming cashflow pressure expected',
+            message: `Projected ending cash drops to ${fmt(pressureDay.projectedEndingCash)} around ${pressureDay.date}.`,
+            reason: `What happened: Projected cash drops to ${fmt(pressureDay.projectedEndingCash)} on ${pressureDay.date}. When: Within the next ${pressureDay.dayOffset + 1} days. Why it matters: Scheduled commitments and daily spending will compress your liquid balance below your safety cushion (${fmt(safeFloor)}). Metric/Event: Projected cash = ${fmt(pressureDay.projectedEndingCash)} vs safety floor ${fmt(safeFloor)}.`,
+            action: 'Postpone non-essential purchases and bring forward customer collections before this date.',
+            created_at: now,
+          });
+        }
+      }
+
+      // RULE 20: LARGE UPCOMING OUTGOING COMMITMENT (>= 40% of Available Cash)
+      if (calendarData.events && availableCash > 0) {
+        const largeCommitment = calendarData.events.find(e => (
+          e.direction === 'outgoing' &&
+          e.amount > 0 &&
+          (e.amount / availableCash) >= 0.40
+        ));
+
+        if (largeCommitment) {
+          const pct = Math.round((largeCommitment.amount / availableCash) * 100);
+          recs.push({
+            id: `calendar_large_outgoing_${largeCommitment.id}`,
+            type: 'large_upcoming_commitment',
+            priority: pct >= 70 ? 'high' : 'medium',
+            severity: pct >= 70 ? 'risk' : 'caution',
+            icon: pct >= 70 ? iconRisk() : iconCaution(),
+            title: `Large upcoming commitment: ${largeCommitment.title}`,
+            message: `${fmt(largeCommitment.amount)} due for ${largeCommitment.title} on ${largeCommitment.date || 'upcoming dates'}.`,
+            reason: `What happened: Significant upcoming outgoing commitment of ${fmt(largeCommitment.amount)} for ${largeCommitment.title}. When: Due on ${largeCommitment.date || 'upcoming days'}. Why it matters: This single commitment consumes ${pct}% of your current available cash (${fmt(availableCash)}). Metric/Event: Upcoming commitment = ${fmt(largeCommitment.amount)} (${pct}% of Available Cash).`,
+            action: 'Earmark settled cash in advance and verify clearing before authorizing additional payments.',
+            created_at: now,
+          });
+        }
+      }
+
+      // RULE 21: PENDING SETTLEMENT DEPENDENCY (Pending >= 50% of obligations due in 3 days)
+      const anchorDate = (calendarData && calendarData.referenceDate)
+        ? new Date(calendarData.referenceDate)
+        : new Date();
+      anchorDate.setHours(0, 0, 0, 0);
+      const threeDaysMs = anchorDate.getTime() + (3 * 86400000);
+
+      const nearTermObligations = (payments || []).filter(p => {
+        if (p.status === 'paid') return false;
+        const dueStr = p.dueDate || p.due_date;
+        if (!dueStr) return false;
+        const dueTime = new Date(dueStr).getTime();
+        return dueTime >= anchorDate.getTime() && dueTime <= threeDaysMs;
+      });
+
+      const nearTermTotal = nearTermObligations.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const pendingAmount = Number(s.pendingSettlement) || 0;
+
+      if (nearTermTotal > 0 && pendingAmount > 0 && (pendingAmount / nearTermTotal) >= 0.50) {
+        const ratioPct = Math.round((pendingAmount / nearTermTotal) * 100);
+        recs.push({
+          id: 'calendar_settlement_dependency',
+          type: 'pending_settlement_dependency',
+          priority: 'medium',
+          severity: 'caution',
+          icon: iconPending(),
+          title: 'Upcoming payments may depend on pending settlements',
+          message: `${fmt(nearTermTotal)} due in the next 3 days while ${fmt(pendingAmount)} is pending settlement.`,
+          reason: `What happened: Pending digital sales represent ${ratioPct}% of payments due in the next 3 days (${fmt(nearTermTotal)} due vs ${fmt(pendingAmount)} pending). When: Within the next 3 days. Why it matters: Pending settlements are not yet cleared Available Cash, and clearance timing variations could leave scheduled payments short. Metric/Event: Pending settlement ratio = ${ratioPct}% (${fmt(pendingAmount)} / ${fmt(nearTermTotal)}).`,
+          action: 'Plan near-term payments using confirmed settled cash rather than relying on pending digital clearances.',
           created_at: now,
         });
       }

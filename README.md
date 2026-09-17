@@ -490,7 +490,94 @@ Phase 14 introduces a deterministic, explainable Business Performance and KPI An
 
 ---
 
-## 12. Local Development Setup
+## 12. Phase 15: Cashflow Calendar & Upcoming Commitments
+
+Phase 15 introduces the **Cashflow Calendar & Upcoming Commitments** layer (`js/cashflow-calendar.js`), giving vendors a forward-looking timeline that answers:
+> *"What cash is expected to come in or go out, and when?"*
+
+It unifies pending settlements, scheduled obligations, recurring cashflow patterns, and existing forecast projections into a single, compact, explainable calendar view without modifying underlying transactions or creating new financial source-of-truth records.
+
+### Architectural Principles & Read-Only Guarantees
+- **Pure Visibility & Analytics Layer**: `CashflowCalendarEngine` is 100% read-only. It never creates, edits, or deletes transactions, obligations, budgets, or goals.
+- **No Database Changes**: Zero new Supabase tables or schemas. All events are derived dynamically in-memory from authenticated client state.
+- **Zero AI Dependencies & Deterministic**: Rule-based normalization and deterministic matching; no external AI APIs or secret keys.
+- **Tenant Isolation**: Operates strictly within authenticated business context, preserving existing RLS and data isolation boundaries.
+
+### Critical Financial Invariants
+> [!IMPORTANT]
+> - **Pending Money is NOT Available Cash**: Pending digital settlements awaiting bank clearance are tracked as expected incoming events, but are **never added to Available Cash**.
+> - **Expected Events are NOT Actual Transactions**: Recurring patterns inferred by the pattern engine are displayed as `EXPECTED` and never persisted or converted into actual ledger entries.
+> - **Projected Ending Cash is a Forecast**: Forward-looking ending cash balances represent projected liquidity based on the `CashflowIntelligence` forecast engine and must never overwrite actual settled account balances.
+
+### Normalized Event Model
+All future cashflow commitments and expectations are normalized into a uniform schema:
+```javascript
+{
+  id: string,          // Deterministic stable ID (e.g., 'settle_tx-123', 'ob_p456', 'rec_exp_dairy')
+  date: string | null, // 'YYYY-MM-DD' or null if unscheduled
+  type: string,        // 'pending_settlement' | 'recurring_income' | 'recurring_expense' | 'obligation' | 'scheduled_cashflow'
+  direction: string,   // 'incoming' | 'outgoing'
+  amount: number,      // Strictly positive numeric amount
+  source: string,      // 'transaction' | 'obligation' | 'pattern' | 'forecast'
+  title: string,       // Clean human-readable description
+  confidence: string,  // 'high' | 'medium' | 'low'
+  status: string       // 'actual' | 'pending' | 'expected' | 'scheduled'
+}
+```
+
+### Supported Event Types & Distinctions
+- **`actual`**: Settled, realized cash movements already recorded.
+- **`pending`**: Real transactions that exist in digital channels (e.g. UPI, Card) but have not settled into liquid bank balances.
+- **`scheduled`**: Confirmed upcoming obligations or payments with explicit due dates.
+- **`expected`**: Inferred recurring inflows (e.g. weekly catering) or operating outflows (e.g. weekly dairy deliveries) with sufficient statistical pattern evidence.
+- **`projected`**: Daily ending cash balance curves provided by the forecasting engine.
+
+### Supported Time Ranges
+The calendar supports three flexible forecasting horizons:
+- **Next 7 Days** (Default): Immediate cash operational view.
+- **Next 14 Days**: Short-term cash management and planning horizon.
+- **Next 30 Days**: Full monthly liquidity outlook.
+
+Range switches recompute the calendar view reactively without full page reloads or duplicated DOM event listeners.
+
+### Event Deduplication
+To prevent double-counting between scheduled obligations and detected recurring patterns:
+- When a detected recurring expense pattern has a corresponding payment obligation (`is_covered_by_obligation === true` or matching stable entity identity), the calendar engine deduplicates the entry and displays only the scheduled obligation.
+- Deduplication affects only calendar representation; underlying database records and pattern engines are never mutated.
+
+### Forecast Integration
+- Reuses `CashflowIntelligence.compute()` to project daily ending cash across the selected window without inventing a second forecasting engine.
+- Fallback deterministic timeline accumulation guarantees that no dates render `NaN`, `Infinity`, or `undefined`.
+- Unscheduled pending transactions without reliable clearance dates are presented clearly in an unscheduled drawer without fabricating false settlement dates.
+
+### Cashly Advisor Integration (Rules 19–21)
+Phase 15 adds three explainable intelligence rules to `CashlyAdvisor`:
+1. **Rule 19 (Upcoming Cash Pressure)**:
+   - *Trigger*: Projected cash drops to or below the safety threshold (`Math.max(500, 10% of Available Cash)`) within the active calendar window.
+   - *Explains*: Exact projected trough amount, date, day offset, and safety floor comparison.
+2. **Rule 20 (Large Upcoming Outgoing Commitment)**:
+   - *Trigger*: A single outgoing commitment consumes $\ge 40\%$ of current Available Cash. Safe against zero division.
+   - *Explains*: Specific event title, date, amount, and exact percentage of Available Cash consumed.
+3. **Rule 21 (Pending Settlement Dependency)**:
+   - *Trigger*: Pending digital sales represent $\ge 50\%$ of obligations due within the next 3 days.
+   - *Explains*: Risk of relying on unsettled funds to meet scheduled payments and cautions that pending funds are not yet cleared liquid cash.
+
+### Alert Engine Integration
+- Emits `CALENDAR_OBLIGATION_EXCEEDS_CASH` alert when scheduled payments due in the next 3 days strictly exceed total Available Cash.
+- Fully adheres to the 24-hour deduplication window to prevent alert spamming.
+
+### UI Integration
+- Added `#insights-calendar-container` to the Insights page directly below KPI analytics.
+- Features a clean, compact timeline with:
+  - Quick range selector pills (`Next 7 Days`, `Next 14 Days`, `Next 30 Days`).
+  - Cash trajectory summary card (`Current Available Cash → Projected Ending Cash`).
+  - Daily date headers with net daily flow (`+₹X` / `-₹Y`).
+  - Type and status badges (`Pending`, `Scheduled`, `Expected`).
+  - Responsive single-column stacking for mobile viewports.
+
+---
+
+## 13. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -524,7 +611,7 @@ Phase 14 introduces a deterministic, explainable Business Performance and KPI An
 
 ---
 
-## 13. Deployment (Vercel / Netlify)
+## 14. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -536,7 +623,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 14. Current Limitations
+## 15. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -546,6 +633,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 15. License
+## 16. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.
