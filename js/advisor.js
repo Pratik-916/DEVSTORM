@@ -260,7 +260,7 @@ const CashlyAdvisor = (() => {
   /* ----------------------------------------------------------
      3. RECOMMENDATION RULES GENERATOR
      ---------------------------------------------------------- */
-  function generate(summaryOverride = null, intelOverride = null, kpiOverride = null, calendarOverride = null) {
+  function generate(summaryOverride = null, intelOverride = null, kpiOverride = null, calendarOverride = null, optionsOverride = null) {
     let opts = {};
     let s = null;
     let intel = null;
@@ -268,7 +268,7 @@ const CashlyAdvisor = (() => {
     let calendar = calendarOverride;
     let customPayments = null;
 
-    if (summaryOverride && typeof summaryOverride === 'object' && ('summaryOverride' in summaryOverride || 'paymentsOverride' in summaryOverride || 'availableCash' in summaryOverride || 'commitmentsOverride' in summaryOverride)) {
+    if (summaryOverride && typeof summaryOverride === 'object' && ('summaryOverride' in summaryOverride || 'paymentsOverride' in summaryOverride || 'availableCash' in summaryOverride || 'commitmentsOverride' in summaryOverride || 'transactionsOverride' in summaryOverride)) {
       opts = summaryOverride;
       s = opts.summaryOverride || (opts.availableCash !== undefined ? opts : null);
       intel = opts.intelOverride || intelOverride;
@@ -276,8 +276,13 @@ const CashlyAdvisor = (() => {
       calendar = opts.calendarOverride || calendarOverride;
       customPayments = opts.paymentsOverride || opts.commitmentsOverride || opts.commitments;
     } else {
+      opts = optionsOverride || {};
       s = summaryOverride;
       intel = intelOverride;
+    }
+
+    if (optionsOverride && typeof optionsOverride === 'object') {
+      Object.assign(opts, optionsOverride);
     }
 
     s = s || (
@@ -1012,6 +1017,48 @@ const CashlyAdvisor = (() => {
           message: `Cashly's internal health audit evaluated your business at Grade ${auditResult.grade} (${auditResult.totalScore}/100).`,
           reason: `What happened: ${lp.title} scored ${lp.score}/20. Why it matters: ${lp.why} Metric/Event: Total score = ${auditResult.totalScore}/100 | ${lp.title} = ${lp.score}/20.`,
           action: lp.how || 'Review your Direct Cashflow Statement and focus on the lowest-scoring health pillar.',
+          created_at: now,
+        });
+      }
+    }
+
+    // PHASE 21: OVERDUE SETTLEMENT RESOLUTION (Rule 26)
+    let settlementEngine = (typeof SettlementReconciliationEngine !== 'undefined')
+      ? SettlementReconciliationEngine
+      : ((typeof window !== 'undefined' && window.SettlementReconciliationEngine)
+          ? window.SettlementReconciliationEngine
+          : ((typeof global !== 'undefined' && global.SettlementReconciliationEngine) ? global.SettlementReconciliationEngine : null));
+
+    if (!settlementEngine && typeof require !== 'undefined') {
+      try {
+        settlementEngine = require('./settlement.js').SettlementReconciliationEngine;
+      } catch (e) {}
+    }
+
+    if (settlementEngine && typeof settlementEngine.getPendingQueue === 'function') {
+      const queue = settlementEngine.getPendingQueue({
+        referenceDate: opts.referenceDate,
+        transactionsOverride: txns,
+      });
+
+      if (queue && (queue.overdueCount > 0 || queue.delayedCount > 0)) {
+        const hasOverdue = queue.overdueCount > 0;
+        const targetCount = hasOverdue ? queue.overdueCount : queue.delayedCount;
+        const targetAmount = hasOverdue ? queue.overdueAmount : queue.delayedAmount;
+        const targetStatus = hasOverdue ? 'overdue (>5 days)' : 'delayed (3-5 days)';
+
+        recs.push({
+          id: 'overdue_settlement_resolution',
+          type: 'settlement_resolution',
+          priority: hasOverdue ? 'high' : 'medium',
+          severity: hasOverdue ? 'risk' : 'caution',
+          icon: hasOverdue ? iconRisk() : iconCaution(),
+          title: hasOverdue
+            ? `${fmt(targetAmount)} in digital sales is overdue for settlement`
+            : `${fmt(targetAmount)} in digital settlements is delayed`,
+          message: `${targetCount} digital transaction(s) totaling ${fmt(targetAmount)} have been pending clearance for ${targetStatus}.`,
+          reason: `WHAT: ${targetCount} pending transaction(s) totaling ${fmt(targetAmount)} are currently ${targetStatus}. WHY: Unsettled customer sales do not count toward your liquid Available Cash, reducing your immediate spending capacity and ability to clear obligations. HOW: Check your merchant gateway dashboard or bank deposit records and use Reconcile Settlements to confirm received funds.`,
+          action: 'Audit your bank and gateway account deposits, then mark received items in Reconcile Settlements.',
           created_at: now,
         });
       }

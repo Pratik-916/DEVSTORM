@@ -70,6 +70,11 @@ const Transactions = (() => {
       ? `<span class="txn-channel-tag">${escapeHtml(txn.channel)}</span>`
       : '';
 
+    // Mark Settled button for pending digital sales
+    const settleActionBtn = (isPending && isSale && txn.paymentMethod !== 'cash')
+      ? `<button type="button" class="btn btn-secondary btn-sm btn-mark-settled" data-id="${txn.id}" title="Mark this transaction as settled in bank/gateway" style="font-size:11px; padding:2px 8px; line-height:1.4; margin-top:4px;">Mark Settled</button>`
+      : '';
+
     return `
       <div class="transaction-item"
            data-type="${txn.type}"
@@ -88,8 +93,9 @@ const Transactions = (() => {
             ${settleBadge}
           </div>
         </div>
-        <div class="txn-right">
+        <div class="txn-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
           <span class="txn-amount ${amountClass}">${amountDisplay}</span>
+          ${settleActionBtn}
         </div>
       </div>`;
   }
@@ -143,6 +149,17 @@ const Transactions = (() => {
       .join('');
 
     container.innerHTML = html;
+
+    // Bind individual Mark Settled buttons
+    container.querySelectorAll('.btn-mark-settled').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        if (typeof SettlementReconciliationEngine !== 'undefined' && typeof SettlementReconciliationEngine.confirmIndividualSettlement === 'function') {
+          SettlementReconciliationEngine.confirmIndividualSettlement(id);
+        }
+      });
+    });
 
     // Re-apply the current active filter
     const activeTab = document.querySelector('#page-transactions .filter-tab.active');

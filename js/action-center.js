@@ -526,6 +526,10 @@ const ActionCenterEngine = (() => {
         actionKey = 'pending_settlement';
         actionType = 'pending_settlement';
         priority = 'medium';
+      } else if (rec.id === 'overdue_settlement_resolution') {
+        actionKey = 'settlement_aging';
+        actionType = 'pending_settlement';
+        priority = rec.priority || 'high';
       } else if (rec.id.startsWith('budget_')) {
         const idPart = rec.id.replace('budget_exceeded_', '').replace('budget_caution_', '');
         actionKey = `budget_${idPart}`;
@@ -709,6 +713,52 @@ const ActionCenterEngine = (() => {
         source: 'audit',
         dueDate: null,
         amount: null,
+        status: 'active',
+      });
+    }
+
+    /* ----------------------------------------------------------
+       SIGNAL 13: SETTLEMENT AGING SIGNALS (Phase 21)
+       ---------------------------------------------------------- */
+    let settlementEngine = (typeof SettlementReconciliationEngine !== 'undefined')
+      ? SettlementReconciliationEngine
+      : ((typeof window !== 'undefined' && window.SettlementReconciliationEngine)
+          ? window.SettlementReconciliationEngine
+          : ((typeof global !== 'undefined' && global.SettlementReconciliationEngine) ? global.SettlementReconciliationEngine : null));
+
+    if (!settlementEngine && typeof require !== 'undefined') {
+      try {
+        settlementEngine = require('./settlement.js').SettlementReconciliationEngine;
+      } catch (e) {}
+    }
+
+    let settlementQueue = options.settlementQueueOverride || null;
+    if (!settlementQueue && settlementEngine && typeof settlementEngine.getPendingQueue === 'function') {
+      settlementQueue = settlementEngine.getPendingQueue({
+        referenceDate: refDate,
+        transactionsOverride: txns,
+      });
+    }
+
+    if (settlementQueue && (settlementQueue.overdueCount > 0 || settlementQueue.delayedCount > 0)) {
+      const isOverdue = settlementQueue.overdueCount > 0;
+      const targetCount = isOverdue ? settlementQueue.overdueCount : settlementQueue.delayedCount;
+      const targetAmount = isOverdue ? settlementQueue.overdueAmount : settlementQueue.delayedAmount;
+      const actionKey = 'settlement_aging';
+
+      addOrMergeCandidate(actionKey, {
+        id: 'act_settlement_aging',
+        type: 'pending_settlement',
+        priority: isOverdue ? 'high' : 'medium',
+        title: isOverdue
+          ? `${fmt(targetAmount)} in digital sales is overdue for settlement`
+          : `${fmt(targetAmount)} in digital settlements is delayed`,
+        description: `WHAT: ${targetCount} pending digital transaction(s) totaling ${fmt(targetAmount)} have aged past standard clearance (${isOverdue ? '>5 days overdue' : '3-5 days delayed'}).`,
+        reason: `WHY: Pending digital sales do not count toward liquid Available Cash until received in your bank/gateway account, restricting your safe-to-spend headroom.`,
+        metric: `METRIC: ${isOverdue ? 'Overdue' : 'Delayed'} = ${fmt(targetAmount)} across ${targetCount} transaction(s) | Total pending = ${fmt(settlementQueue.totalPendingAmount)}`,
+        source: 'settlement',
+        dueDate: null,
+        amount: targetAmount,
         status: 'active',
       });
     }

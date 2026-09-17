@@ -716,6 +716,132 @@ const AppState = (() => {
     return false;
   }
 
+  /**
+   * PHASE 21: Settle digital transactions batch.
+   * Atomically settles pending digital sales, verifies online connectivity,
+   * prevents double settlement (idempotent), records confirmed gateway fees,
+   * updates Supabase if connected, and refreshes all views so Available Cash
+   * naturally reflects the settled funds without artificial balance adjustments.
+   *
+   * @param {Array<string>} ids Array of transaction IDs to settle
+   * @param {Object} [options] Settlement options (gatewayFee, confirmGatewayFee, payoutReference, etc.)
+   * @returns {Promise<{success: boolean, settledIds: string[], settledCount: number, settledAmount: number, error?: string}>}
+   */
+  async function settleTransactionsBatch(ids, options = {}) {
+    // 1. Offline safety: reject offline financial settlement
+    if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+      return {
+        success: false,
+        error: 'Settlement requires an internet connection.',
+        settledIds: [],
+        settledCount: 0,
+        settledAmount: 0,
+      };
+    }
+
+    // 2. Validate input array
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return {
+        success: false,
+        error: 'No transaction IDs provided for settlement.',
+        settledIds: [],
+        settledCount: 0,
+        settledAmount: 0,
+      };
+    }
+
+    // 3. Find and validate pending transactions
+    const toSettle = [];
+    const idSet = new Set(ids);
+
+    for (const txn of _store.transactions) {
+      if (idSet.has(txn.id)) {
+        // Must be a sale and currently pending
+        if (txn.type === TRANSACTION_TYPES.SALE && txn.settlementStatus === SETTLEMENT_STATUSES.PENDING) {
+          toSettle.push(txn);
+        }
+      }
+    }
+
+    if (toSettle.length === 0) {
+      return {
+        success: false,
+        error: 'No valid pending digital transactions found to settle (transactions may already be settled or do not exist).',
+        settledIds: [],
+        settledCount: 0,
+        settledAmount: 0,
+      };
+    }
+
+    // 4. Update transaction settlement status while strictly preserving original transaction date
+    const settledTimestamp = options.settledAt || new Date().toISOString();
+    const settledIds = [];
+    let settledAmount = 0;
+
+    for (const txn of toSettle) {
+      txn.settlementStatus = SETTLEMENT_STATUSES.SETTLED;
+      txn.settledAt = settledTimestamp;
+      if (options.payoutReference) {
+        txn.payoutReference = String(options.payoutReference).trim();
+      }
+      if (options.settlementSource) {
+        txn.settlementSource = String(options.settlementSource).trim();
+      }
+      settledIds.push(txn.id);
+      settledAmount += Number(txn.amount) || 0;
+    }
+
+    // 5. Handle explicit confirmed gateway fee / MDR if requested
+    let feeRecorded = false;
+    if (options.confirmGatewayFee === true && options.gatewayFee && Number(options.gatewayFee) > 0) {
+      const feeAmount = Number(options.gatewayFee);
+      const feeTxn = {
+        source: TRANSACTION_SOURCES.MANUAL,
+        type: TRANSACTION_TYPES.EXPENSE,
+        amount: feeAmount,
+        paymentMethod: PAYMENT_METHODS.BANK,
+        channel: options.gatewayChannel || 'Bank / Gateway Payout',
+        reference: options.payoutReference ? `FEE-${options.payoutReference}` : `FEE-MDR-${Date.now().toString().slice(-6)}`,
+        settlementStatus: SETTLEMENT_STATUSES.SETTLED,
+        category: 'other',
+        description: options.gatewayFeeDescription || 'Payment Gateway Fee / MDR',
+        date: options.settlementDate || new Date().toISOString().slice(0, 10),
+      };
+      await addTransaction(feeTxn);
+      feeRecorded = true;
+    }
+
+    // 6. Persist settled status to Supabase if connected
+    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+      try {
+        const ok = await SupabaseService.insertTransactions(toSettle);
+        if (!ok) {
+          console.warn('[Cashly] Notice: Supabase batch settlement update returned false.');
+        }
+      } catch (err) {
+        console.warn('[Cashly] Notice persisting settlement batch to Supabase:', err.message || err);
+      }
+    }
+
+    // 7. Refresh authoritative application state (Available Cash increases naturally via CashflowEngine)
+    refreshAllViews();
+
+    return {
+      success: true,
+      settledIds,
+      settledCount: settledIds.length,
+      settledAmount,
+      feeRecorded,
+    };
+  }
+
+  /**
+   * Convenience wrapper to settle a single transaction.
+   */
+  async function settleTransaction(id, options = {}) {
+    return settleTransactionsBatch([id], options);
+  }
+
   /* ---- Payments / Obligations ---- */
 
   /** Return all upcoming payments sorted by due date. */
@@ -1029,6 +1155,8 @@ const AppState = (() => {
     addTransactionsBatch,
     updateTransaction,
     deleteTransaction,
+    settleTransaction,
+    settleTransactionsBatch,
     getFinancialAccounts,
     addFinancialAccount,
     updateFinancialAccount,

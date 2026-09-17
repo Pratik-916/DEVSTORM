@@ -219,7 +219,7 @@
 
       <!-- Footer -->
       <div class="sidebar-footer">
-        <p class="sidebar-footer-text">Cashly v1.5 &bull; Demo Mode</p>
+        <p class="sidebar-footer-text">Cashly v1.6 &bull; Demo Mode</p>
       </div>
     </aside>
 
@@ -739,9 +739,18 @@
            ================================================ -->
         <section class="page" id="page-transactions" data-page="transactions" aria-label="Transactions">
 
-          <div class="page-header-row">
-            <h1 class="page-header-title">Transactions</h1>
-            <p class="page-header-subtitle">Your sales, expenses, and pending activity.</p>
+          <div class="page-header-row" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div>
+              <h1 class="page-header-title">Transactions</h1>
+              <p class="page-header-subtitle">Your sales, expenses, and pending activity.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-reconcile-settlements" aria-label="Reconcile digital settlements"
+              onclick="if(typeof SettlementReconciliationEngine!=='undefined')SettlementReconciliationEngine.openReconciliationModal();">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Reconcile Settlements
+            </button>
           </div>
 
           <!-- Filters -->
@@ -1333,7 +1342,7 @@
                 </div>
                 <div>
                   <p class="settings-row-label">Version</p>
-                  <p class="settings-row-desc">Cashly Demo v1.5</p>
+                  <p class="settings-row-desc">Cashly Demo v1.6</p>
                 </div>
               </div>
             </div>
@@ -2199,6 +2208,8 @@
   <script src="js/mitigation.js"></script>
   <!-- Cashflow Statement & Financial Health Audit Engine (Phase 20) -->
   <script src="js/statement.js"></script>
+  <!-- Cash Settlement Reconciliation Engine (Phase 21) -->
+  <script src="js/settlement.js"></script>
   <script src="js/router.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/transactions.js"></script>

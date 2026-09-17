@@ -867,9 +867,71 @@ Evaluates five transparent, deterministic pillars (0–20 points each, strictly 
 - **Action Center (Signal 12 - `health_audit_signals`)**: Surfaces prioritized action cards when the health audit detects Grade D or high liquidity vulnerability.
 - **Cashly Advisor (Rule 25 - `financial_health_audit`)**: Recommends specific operational improvements based on the lowest-scoring health audit pillar.
 
+### Application Versioning
+- Application release upgraded from **v1.4** to **v1.5** (Phase 20 completed).
+- Service Worker offline cache updated from `cashly-cache-v9` to `cashly-cache-v10` with full offline support for `js/statement.js`.
+
 ---
 
-## 18. Local Development Setup
+## 18. Cash Settlement Reconciliation & Settlement Lifecycle Management (Phase 21)
+
+Phase 21 closes the missing operational loop between pending digital customer sales ($T+1/T+2$) and liquid Available Cash through a transparent settlement lifecycle management engine ([`js/settlement.js`](file:///d:/Projects/DEVSTORM/js/settlement.js)).
+
+> [!IMPORTANT]
+> **Operational Confirmation Boundary**: "Mark Settled" confirms that funds have **already been received** by the merchant in their bank or gateway account. Cashly does not initiate or verify real-world banking transfers.
+
+### Core Objectives
+Closes the lifecycle loop:
+$$\text{Pending Digital Sale} \longrightarrow \text{Settlement Aging} \longrightarrow \text{Merchant Confirms Payout} \longrightarrow \text{Reconciliation} \longrightarrow \text{Available Cash Updates}$$
+
+### Deterministic Aging Definitions
+Ages each pending digital transaction by calendar days relative to today:
+- **`ON_SCHEDULE` (0–2 calendar days)**: Standard clearing window for modern UPI and Card merchant aggregators.
+- **`DELAYED` (3–5 calendar days)**: Moderate clearing delay; merchant is advised to check pending gateway batches.
+- **`OVERDUE` (>5 calendar days)**: Significant settlement clearance lag requiring immediate gateway/bank verification.
+
+### Key Capabilities & Architectural Invariants
+
+1. **Available Cash Invariant**:
+   - Cashly **never** manually increments Available Cash.
+   - When a transaction's `settlementStatus` transitions from `'pending'` to `'settled'`, the existing `CashflowEngine` and `AppState.getSummary()` naturally recognize the settled inflow:
+     $$\text{Available Cash} = \max(0, (\text{Settled Sales} + \text{Base Float}) - \text{Total Expenses})$$
+   - All dependent views (Dashboard, Transactions, Reports, Cash Planning, Cashflow Statement, Action Center, Advisor) refresh reactively.
+
+2. **Idempotency & Double-Settlement Protection**:
+   - Settle operations strictly validate transaction status. Attempting to settle an already-settled transaction returns a clean rejection and prevents double-counting or duplicate balance mutations.
+
+3. **Batch Payout Matching & Variance Handling**:
+   - `SettlementReconciliationEngine.matchBatchPayout(targetAmount, options)` matches received bank payouts against pending digital sales.
+   - Read-only matching: Never silently forces or confirms a match without explicit merchant confirmation.
+   - Computes variance:
+     $$\text{Variance} = |\text{Gross Candidate Sales} - \text{Target Bank Payout}|$$
+
+4. **Explicit Gateway Fee / MDR Recording**:
+   - If gross candidate sales exceed net bank payout, the difference is proposed as a gateway fee.
+   - Cashly **requires explicit merchant confirmation** before recording fees.
+   - When confirmed, an expense is recorded using Cashly's existing transaction schema (`type: 'expense'`, `category: 'other'`, `paymentMethod: 'bank_transfer'`) to ensure financial statements balance.
+
+5. **Strict Offline Safety**:
+   - Reject offline settlement mutations immediately: `"Settlement requires an internet connection."`
+   - Prevents optimistic desynchronization or phantom local balance increases.
+
+6. **Database & RLS Security**:
+   - Reuses existing `public.transactions` table and Supabase RLS policies.
+   - All mutations strictly scoped to authenticated `business_id` and `user_id`.
+   - Zero exposure of service-role keys or privileged credentials.
+
+### Action Center & Advisor Integration
+- **Action Center (Signal 13 - `settlement_aging_signals`)**: Emits high-priority actions for overdue settlements (>5 days) and medium-priority actions for delayed settlements (3–5 days), fully deduplicated against Advisor rules.
+- **Cashly Advisor (Rule 26 - `overdue_settlement_resolution`)**: Provides structured decision support detailing **WHAT** settlement is delayed, **WHY** it restricts liquidity, and **HOW** to verify it.
+
+### Application Versioning
+- Application release upgraded from **v1.5** to **v1.6** (Phase 21 completed).
+- Service Worker offline cache updated from `cashly-cache-v10` to `cashly-cache-v11` with full offline support for `js/settlement.js`.
+
+---
+
+## 19. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -903,7 +965,7 @@ Evaluates five transparent, deterministic pillars (0–20 points each, strictly 
 
 ---
 
-## 19. Deployment (Vercel / Netlify)
+## 20. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -915,7 +977,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 20. Current Limitations
+## 21. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -925,6 +987,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 21. License
+## 22. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.
