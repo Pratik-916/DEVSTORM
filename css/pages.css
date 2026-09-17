@@ -500,4 +500,24 @@
   .method-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  /* Phase 14: Business Performance KPI Responsive Layout */
+  .kpi-cards-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 479px) {
+  .kpi-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .kpi-period-pills {
+    width: 100%;
+    display: flex;
+    justify-content: stretch;
+  }
+  .kpi-period-pills button {
+    flex: 1;
+    text-align: center;
+  }
 }

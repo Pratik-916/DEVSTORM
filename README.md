@@ -443,7 +443,54 @@ Budget usage is calculated strictly from matching expense transactions in the ac
 
 ---
 
-## 11. Local Development Setup
+## 11. Phase 14: Business Performance & KPI Analytics
+
+Phase 14 introduces a deterministic, explainable Business Performance and KPI Analytics layer (`js/kpi.js`), empowering vendors to track sales velocity, spending rates, cash movement trends, and goal/budget health across comparative time horizons.
+
+### Key Capabilities
+- **Deterministic KPI Engine**: Derives all metrics in-memory strictly from authenticated transaction history and centralized cashflow states.
+- **Period Comparisons**:
+  - `week`: Current calendar week (Monday to Sunday) vs. previous calendar week.
+  - `month`: Current calendar month vs. previous calendar month.
+  - `30days`: Latest 30-day window (`[today - 29, today]`) vs. preceding 30-day window (`[today - 59, today - 30]`).
+- **Core KPI Metrics**:
+  - **Total Sales**: Total customer sales in period (settled cash/digital + pending digital sales).
+  - **Total Expenses**: Operational expenses and personal owner withdrawals.
+  - **Available Cash**: Centralized liquid cash in hand/bank (reused from AppState / CashflowEngine; pending sales strictly excluded).
+  - **Safe to Spend**: Liquid reserves remaining after obligation reserves and safety buffer.
+  - **Net Cashflow**: Total Sales minus Total Expenses.
+  - **Average Daily Sales & Expenses**: Period total divided by period day count.
+  - **Pending Settlement Percentage**: Unsettled digital receipts as a percentage of total sales.
+- **Critical Financial Invariance**:
+  > [!IMPORTANT]
+  > **Sales vs. Available Cash Semantics**: Total Sales includes both settled and pending sales for gross performance reporting. However, **pending sales NEVER count as Available Cash** until they clear and settle. Net Cashflow and daily cash movements strictly enforce this separation.
+- **Period-Over-Period Comparison Formula**:
+  $$\text{Percentage Change} = \frac{\text{Current} - \text{Previous}}{|\text{Previous}|} \times 100$$
+  - **Zero/Null Handling**: If previous value is `0` or `null`, a safe comparison state (`0%` or `+100% (New)`) is returned without throwing `NaN`, `Infinity`, or `undefined`.
+- **Daily Cashflow Trend**:
+  - Sequence of daily buckets displaying settled incoming cash, outgoing cash, daily net flow, and cumulative ending available cash.
+  - Pending transactions do not inflate daily incoming cash.
+  - Ending cash strictly reconstructs cumulative balance from transaction history without fabricating historical balances.
+- **Goals & Budgets Health Summaries**:
+  - Aggregates status counts directly from `BusinessGoalsEngine` (`activeGoals`, `onTrack`, `needsAttention`, `atRisk`, `completed`) and `BudgetEngine` (`activeBudgets`, `healthy`, `caution`, `exceeded`).
+  - Zero duplication of planning or threshold algorithms.
+- **Advisor Rules 15–18 Integration**:
+  - **Rule 15 (Sales Decrease)**: Triggers when period sales fall by $\ge 15\%$ vs. previous period.
+  - **Rule 16 (Expense Surge)**: Triggers when period operating expenses rise by $\ge 20\%$ vs. previous period.
+  - **Rule 17 (Cash Contraction)**: Triggers when comparable liquid cash contracts by $\ge 10\%$.
+  - **Rule 18 (Plan Pressure)**: Triggers when multiple budgets are exceeded or multiple goals are at risk.
+  - All recommendations follow the explainability contract:
+    - **What happened**: Observed variance and figures.
+    - **Why it matters**: Business impact on cash buffer and runway.
+    - **Metric**: Exact triggered metric ratio.
+- **Insights UI**:
+  - Compact responsive KPI grid embedded directly in the Insights page (`#insights-kpi-container`).
+  - Single-click period selector (This Week, This Month, Last 30 Days) updating views dynamically without full page reloads.
+  - Mobile layout cleanly stacks KPI cards in a readable single-column flow.
+
+---
+
+## 12. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -477,7 +524,7 @@ Budget usage is calculated strictly from matching expense transactions in the ac
 
 ---
 
-## 12. Deployment (Vercel / Netlify)
+## 13. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -489,7 +536,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 13. Current Limitations
+## 14. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -499,6 +546,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 14. License
+## 15. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

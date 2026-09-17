@@ -260,7 +260,7 @@ const CashlyAdvisor = (() => {
   /* ----------------------------------------------------------
      3. RECOMMENDATION RULES GENERATOR
      ---------------------------------------------------------- */
-  function generate(summaryOverride = null, intelOverride = null) {
+  function generate(summaryOverride = null, intelOverride = null, kpiOverride = null) {
     const s = summaryOverride || (
       (typeof AppState !== 'undefined' && typeof AppState.getSummary === 'function')
         ? AppState.getSummary()
@@ -690,6 +690,87 @@ const CashlyAdvisor = (() => {
       });
     }
 
+    // PHASE 14: BUSINESS PERFORMANCE & KPI RULES (Rules 15-18)
+    const kpi = kpiOverride || (
+      (typeof KPIEngine !== 'undefined' && typeof KPIEngine.compute === 'function')
+        ? KPIEngine.compute({ summaryOverride: s, transactionsOverride: txns })
+        : null
+    );
+
+    if (kpi && kpi.comparison) {
+      // RULE 15: SALES DECREASED SIGNIFICANTLY VS PREVIOUS COMPARABLE PERIOD (>= 15% decrease)
+      if (kpi.comparison.sales && kpi.comparison.sales.percentageChange !== null && kpi.comparison.sales.percentageChange <= -15) {
+        const dropPct = Math.abs(kpi.comparison.sales.percentageChange);
+        const isUrgent = dropPct >= 30;
+        recs.push({
+          id: 'kpi_sales_decreased',
+          type: 'kpi_sales_drop',
+          priority: isUrgent ? 'high' : 'medium',
+          severity: isUrgent ? 'risk' : 'caution',
+          icon: isUrgent ? iconRisk() : iconCaution(),
+          title: 'Sales decreased significantly vs previous period',
+          message: `Sales fell ${dropPct}% compared with the previous period (${fmt(kpi.comparison.sales.current)} vs ${fmt(kpi.comparison.sales.previous)}).`,
+          reason: `What happened: Sales decreased ${dropPct}% compared with the previous period. Why it matters: Lower sales can reduce the cash available for upcoming payments. Metric: Sales vs previous period = -${dropPct}%.`,
+          action: 'Audit lower sales channels, accelerate collection of receivables, or run targeted promotions.',
+          created_at: now,
+        });
+      }
+
+      // RULE 16: EXPENSES INCREASED SIGNIFICANTLY VS PREVIOUS COMPARABLE PERIOD (>= 20% increase)
+      if (kpi.comparison.expenses && kpi.comparison.expenses.percentageChange !== null && kpi.comparison.expenses.percentageChange >= 20) {
+        const surgePct = kpi.comparison.expenses.percentageChange;
+        const isUrgent = surgePct >= 40;
+        recs.push({
+          id: 'kpi_expenses_increased',
+          type: 'kpi_expense_surge',
+          priority: isUrgent ? 'high' : 'medium',
+          severity: isUrgent ? 'risk' : 'caution',
+          icon: isUrgent ? iconRisk() : iconCaution(),
+          title: 'Expenses increased significantly vs previous period',
+          message: `Operating expenses rose ${surgePct}% compared with the previous period (${fmt(kpi.comparison.expenses.current)} vs ${fmt(kpi.comparison.expenses.previous)}).`,
+          reason: `What happened: Operating expenses increased ${surgePct}% compared with the previous period. Why it matters: Faster outflow accelerates cash burn and tightens your Safe to Spend margin. Metric: Expenses vs previous period = +${surgePct}%.`,
+          action: 'Audit operational costs, freeze non-essential inventory purchases, and postpone discretionary spending.',
+          created_at: now,
+        });
+      }
+
+      // RULE 17: CASH CONTRACTION (Only trigger when valid comparable cash metric exists)
+      if (kpi.comparison.cash && kpi.comparison.cash.previous !== null && kpi.comparison.cash.percentageChange !== null && kpi.comparison.cash.percentageChange <= -10) {
+        const dropPct = Math.abs(kpi.comparison.cash.percentageChange);
+        const isUrgent = dropPct >= 25 || (kpi.availableCash < upcomingObligations);
+        recs.push({
+          id: 'kpi_cash_contraction',
+          type: 'kpi_cash_contraction',
+          priority: isUrgent ? 'high' : 'medium',
+          severity: isUrgent ? 'risk' : 'caution',
+          icon: isUrgent ? iconRisk() : iconCaution(),
+          title: 'Available cash position contracting',
+          message: `Liquid cash contracted by ${dropPct}% compared to previous period-end baseline (${fmt(kpi.comparison.cash.current)} vs ${fmt(kpi.comparison.cash.previous)}).`,
+          reason: `What happened: Available cash decreased ${dropPct}% compared with the previous period. Why it matters: Cash reserves are contracting faster than replenishment, reducing financial safety. Metric: Cash vs previous period = -${dropPct}%.`,
+          action: 'Protect liquid reserves by delaying major equipment purchases or supplier settlements.',
+          created_at: now,
+        });
+      }
+
+      // RULE 18: COMBINED GOAL / BUDGET PRESSURE (Multiple budgets exceeded OR multiple goals at risk)
+      const exceededBudgets = kpi.budgetsSummary ? kpi.budgetsSummary.exceeded : 0;
+      const atRiskGoals = kpi.goalsSummary ? kpi.goalsSummary.atRisk : 0;
+      if (exceededBudgets >= 2 || atRiskGoals >= 2 || (exceededBudgets >= 1 && atRiskGoals >= 1)) {
+        recs.push({
+          id: 'kpi_goal_budget_pressure',
+          type: 'kpi_plan_pressure',
+          priority: 'high',
+          severity: 'risk',
+          icon: iconRisk(),
+          title: 'Multiple goals and budgets under pressure',
+          message: `${exceededBudgets} budget${exceededBudgets === 1 ? '' : 's'} exceeded and ${atRiskGoals} goal${atRiskGoals === 1 ? '' : 's'} at risk.`,
+          reason: `What happened: Multiple financial controls breached thresholds (${exceededBudgets} exceeded budgets, ${atRiskGoals} at-risk goals). Why it matters: Compounding variances threaten overall business stability and cash runways. Metric: Exceeded budgets = ${exceededBudgets}, At-risk goals = ${atRiskGoals}.`,
+          action: 'Pause discretionary spending in exceeded budget categories and adjust goal contribution schedules.',
+          created_at: now,
+        });
+      }
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({
@@ -1040,6 +1121,6 @@ if (typeof module !== 'undefined' && module.exports) {
   };
 }
 
-if (typeof document !== 'undefined') {
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('DOMContentLoaded', CashlyAdvisor.init);
 }

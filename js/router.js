@@ -63,8 +63,13 @@ const Router = (() => {
       }
     }
 
-    if (page === 'insights' && typeof Advisor !== 'undefined') {
-      Advisor.render();
+    if (page === 'insights') {
+      if (typeof KPIEngine !== 'undefined' && typeof KPIEngine.render === 'function') {
+        KPIEngine.render('insights-kpi-container');
+      }
+      if (typeof Advisor !== 'undefined') {
+        Advisor.render();
+      }
     }
 
     if (page === 'admin' && typeof Admin !== 'undefined') {
