@@ -73,6 +73,9 @@ const Router = (() => {
       if (typeof CashPlanningEngine !== 'undefined' && typeof CashPlanningEngine.render === 'function') {
         CashPlanningEngine.render('insights-cash-planning-container');
       }
+      if (typeof CashflowMitigationEngine !== 'undefined' && typeof CashflowMitigationEngine.render === 'function') {
+        CashflowMitigationEngine.render('insights-mitigation-container');
+      }
       if (typeof CashflowCalendarEngine !== 'undefined' && typeof CashflowCalendarEngine.render === 'function') {
         CashflowCalendarEngine.render('insights-calendar-container');
       }

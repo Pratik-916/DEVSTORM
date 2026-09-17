@@ -315,7 +315,9 @@ const ActionCenterEngine = (() => {
         const calc = BudgetEngine.calculateBudget(b);
         if (!calc) return;
 
-        if (calc.status === 'Exceeded' || calc.percentage_used >= 100) {
+        const pctUsed = Number(calc.percentage_used || calc.percentageUsed) || 0;
+
+        if (calc.status === 'Exceeded' || pctUsed >= 100) {
           const overspent = Math.max(0, calc.spent - calc.limit);
           const actionKey = `budget_${b.id || b.name}`;
           addOrMergeCandidate(actionKey, {
@@ -323,24 +325,24 @@ const ActionCenterEngine = (() => {
             type: 'budget_pressure',
             priority: 'high',
             title: `Budget exceeded: ${b.name}`,
-            description: `WHAT: Spending in ${b.name} has reached ${fmt(calc.spent)} (${calc.percentage_used.toFixed(0)}% of limit ${fmt(calc.limit)}).`,
+            description: `WHAT: Spending in ${b.name} has reached ${fmt(calc.spent)} (${pctUsed.toFixed(0)}% of limit ${fmt(calc.limit)}).`,
             reason: `WHY: You have exceeded this category budget by ${fmt(overspent)}, which directly reduces your safe-to-spend buffer.`,
-            metric: `METRIC: Spent ${fmt(calc.spent)} / Limit ${fmt(calc.limit)} (${calc.percentage_used.toFixed(0)}%)`,
+            metric: `METRIC: Spent ${fmt(calc.spent)} / Limit ${fmt(calc.limit)} (${pctUsed.toFixed(0)}%)`,
             source: 'budget',
             dueDate: null,
             amount: overspent,
             status: 'active',
           });
-        } else if (calc.status === 'Caution' || (calc.percentage_used >= 80 && calc.percentage_used < 100)) {
+        } else if (calc.status === 'Caution' || (pctUsed >= 80 && pctUsed < 100)) {
           const actionKey = `budget_${b.id || b.name}`;
           addOrMergeCandidate(actionKey, {
             id: `act_${actionKey}`,
             type: 'budget_pressure',
             priority: 'medium',
             title: `Budget nearing limit: ${b.name}`,
-            description: `WHAT: ${b.name} spending has reached ${fmt(calc.spent)} (${calc.percentage_used.toFixed(0)}% of ${fmt(calc.limit)}).`,
+            description: `WHAT: ${b.name} spending has reached ${fmt(calc.spent)} (${pctUsed.toFixed(0)}% of ${fmt(calc.limit)}).`,
             reason: `WHY: Only ${fmt(calc.remaining)} remains before exceeding your planned threshold.`,
-            metric: `METRIC: Remaining = ${fmt(calc.remaining)} (${calc.percentage_used.toFixed(0)}% used)`,
+            metric: `METRIC: Remaining = ${fmt(calc.remaining)} (${pctUsed.toFixed(0)}% used)`,
             source: 'budget',
             dueDate: null,
             amount: calc.remaining,
@@ -640,6 +642,41 @@ const ActionCenterEngine = (() => {
             source: 'forecast',
             dueDate: pp.date || null,
             amount: pp.amount || null,
+            status: 'active',
+          });
+        }
+      });
+    }
+
+    /* ----------------------------------------------------------
+       SIGNAL 11: MITIGATION PLAYBOOK SIGNALS (Phase 19)
+       ---------------------------------------------------------- */
+    let mitigation = options.mitigationOverride || null;
+    if (!mitigation && typeof CashflowMitigationEngine !== 'undefined' && typeof CashflowMitigationEngine.compute === 'function') {
+      mitigation = CashflowMitigationEngine.compute({
+        horizonDays: 7,
+        referenceDate: refDate,
+        summaryOverride: summary,
+        paymentsOverride: payments,
+        transactionsOverride: txns,
+      });
+    }
+
+    if (mitigation && Array.isArray(mitigation.strategies)) {
+      mitigation.strategies.forEach(strat => {
+        if (strat.isAvailable && (strat.recoveryStatus === 'RESOLVED' || strat.recoveryStatus === 'PARTIALLY_MITIGATED')) {
+          const actionKey = `mitigation_${strat.id}`;
+          addOrMergeCandidate(actionKey, {
+            id: `act_${actionKey}`,
+            type: 'cash_preservation',
+            priority: strat.recoveryStatus === 'RESOLVED' ? 'high' : 'medium',
+            title: `Preservation: ${strat.title}`,
+            description: `WHAT: ${strat.summary}`,
+            reason: `WHY: ${strat.reason}`,
+            metric: `METRIC: Recovery status = ${strat.recoveryStatus} | Impact = ${fmt(strat.projectedImpact)}`,
+            source: 'mitigation',
+            dueDate: strat.targetDate || strat.hypotheticalNewDate || null,
+            amount: strat.amount || null,
             status: 'active',
           });
         }

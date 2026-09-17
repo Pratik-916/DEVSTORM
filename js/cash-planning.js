@@ -485,7 +485,7 @@ const CashPlanningEngine = (() => {
             amount: calc.spent - calc.limit,
             what: `WHAT: Budget "${b.name}" has been exceeded by ${fmt(calc.spent - calc.limit)}.`,
             why: `WHY: Over-budget spending drains cash reserves and increases near-term cashflow pressure.`,
-            metric: `METRIC: Spent = ${fmt(calc.spent)} vs Limit = ${fmt(calc.limit)} (+${calc.percentage_used.toFixed(0)}%)`,
+            metric: `METRIC: Spent = ${fmt(calc.spent)} vs Limit = ${fmt(calc.limit)} (+${(Number(calc.percentage_used || calc.percentageUsed) || 0).toFixed(0)}%)`,
             source: 'budget',
           });
         }

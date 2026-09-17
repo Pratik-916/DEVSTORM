@@ -770,9 +770,61 @@ Every pressure point includes structured explainable context:
 - **Action Center (Signal 10)**: Surfaces prioritized planning signals (`cash_planning_signals`) into `ActionCenterEngine` without duplicating existing readiness or scenario actions.
 - **Cashly Advisor (Rule 23 - Cash Planning Pressure Point)**: Triggers an explainable advisory card when a high-priority pressure point is detected in the 7-day planning horizon.
 
+### Application Versioning
+- Application release upgraded from **v1.3** to **v1.4** (Phase 19 completed).
+- Service Worker offline cache updated from `cashly-cache-v8` to `cashly-cache-v9` with full offline support for `js/mitigation.js`.
+
 ---
 
-## 16. Local Development Setup
+## 16. Cashflow Pressure Mitigation & Cash Preservation Playbook (Phase 19)
+
+Phase 19 introduces a deterministic, explainable, 100% read-only decision-support and mitigation layer (`CashflowMitigationEngine` in [`js/mitigation.js`](file:///d:/Projects/DEVSTORM/js/mitigation.js)). When future cash pressure points are projected, it provides practical operational levers to protect the business cash cushion without taking expensive debt.
+
+### Core Objective
+The Cash Preservation Playbook answers:
+> *"What practical operational lever could reduce this cash pressure, and what would the projected cash position look like if I hypothetically used it?"*
+
+### Architecture & Financial Invariants
+- **100% Read-Only**: Zero database mutations, zero Supabase writes, zero `localStorage` state persistence.
+- **Zero Redundant Forecast Engines**: Reuses `CashPlanningEngine` and `CashflowCalendarEngine`.
+- **Never Automatically Move Payments**: Staggering is hypothetical decision-support; real payment records remain unchanged.
+- **Never Treat Targets as Cash**: Collection targets are labeled *"Target to collect"*; they are never inserted into Available Cash or base forecasts.
+- **Zero Arbitrary Thresholds**: Reuses verified safety buffer from `CashflowIntelligence.compute().safetyBuffer`.
+
+### Three Deterministic Mitigation Levers
+
+1. **Bill Staggering**:
+   - Identifies upcoming negotiable, non-essential outgoing commitments due on or before the pressure date.
+   - **Protection Rule**: Never recommends essential, statutory, legal, tax, wage, rent, or loan commitments for staggering.
+   - Deterministically calculates the earliest postponement date post-trough where incoming customer cash settles or cashflow normalizes.
+
+2. **Receivables Collection Target**:
+   - Calculates the minimum additional customer collection required before the trough date to keep projected cash at or above the safety buffer:
+     $$\text{Target to Collect} = \max(0, \text{Safety Buffer} - \text{Base Minimum Cash})$$
+   - Clearly explains that collection timing is uncertain and intended as a planning target.
+
+3. **Discretionary Spending Freeze**:
+   - Inspects `BudgetEngine` active discretionary categories (`personal`, `other`, non-essential).
+   - Defensibly estimates cumulative cash savings over days leading to the pressure trough without inventing arbitrary burn rates.
+   - Gracefully marks the strategy unavailable if no discretionary budgets are active.
+
+### Hypothetical Before vs. After Simulation
+Simulates the operational impact of applying each lever, producing:
+- **Base vs. Mitigated Minimum Projected Cash (Trough)**
+- **Base vs. Mitigated Ending Cash**
+- **Cash Improvement Amount**
+- **Deterministic Recovery Status**:
+  - `RESOLVED`: Mitigated cash trough is restored at or above Safety Buffer.
+  - `PARTIALLY_MITIGATED`: Deficit is eliminated or improved, but remains below Safety Buffer.
+  - `UNRESOLVED`: Deficit exceeds single-lever mitigation capacity.
+
+### Action Center & Advisor Integration
+- **Action Center (Signal 11 - `mitigation_playbook_signals`)**: Surfaces actionable preservation cards for high-severity pressure points, adhering to the 5 primary actions limit, deduplication, and critical protection.
+- **Cashly Advisor (Rule 24 - `cash_mitigation_strategy`)**: Emits explainable preservation guidance detailing what lever to pull and the simulated rupee improvement.
+
+---
+
+## 17. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -806,7 +858,7 @@ Every pressure point includes structured explainable context:
 
 ---
 
-## 17. Deployment (Vercel / Netlify)
+## 18. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -818,7 +870,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 18. Current Limitations
+## 19. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -828,6 +880,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 19. License
+## 20. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

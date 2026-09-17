@@ -943,6 +943,42 @@ const CashlyAdvisor = (() => {
       }
     }
 
+    // PHASE 19: CASHFLOW MITIGATION PLAYBOOK (Rule 24)
+    const mitigationEngine = (typeof CashflowMitigationEngine !== 'undefined')
+      ? CashflowMitigationEngine
+      : ((typeof window !== 'undefined' && window.CashflowMitigationEngine)
+          ? window.CashflowMitigationEngine
+          : ((typeof global !== 'undefined' && global.CashflowMitigationEngine) ? global.CashflowMitigationEngine : null));
+
+    if (mitigationEngine && typeof mitigationEngine.compute === 'function') {
+      const mitData = mitigationEngine.compute({
+        horizonDays: 7,
+        referenceDate: opts.referenceDate,
+        summaryOverride: s,
+        paymentsOverride: payments,
+        transactionsOverride: txns,
+      });
+
+      if (mitData && Array.isArray(mitData.strategies)) {
+        const topStrat = mitData.strategies.find(st => st.isAvailable && st.recoveryStatus === 'RESOLVED') ||
+                         mitData.strategies.find(st => st.isAvailable);
+        if (topStrat) {
+          recs.push({
+            id: `cash_mitigation_${topStrat.id}`,
+            type: 'cash_mitigation',
+            priority: topStrat.recoveryStatus === 'RESOLVED' ? 'high' : 'medium',
+            severity: topStrat.recoveryStatus === 'RESOLVED' ? 'risk' : 'caution',
+            icon: topStrat.recoveryStatus === 'RESOLVED' ? iconRisk() : iconCaution(),
+            title: `Preservation lever: ${topStrat.title}`,
+            message: topStrat.summary,
+            reason: `${topStrat.reason} ${topStrat.simulation ? `(Simulated trough improvement: +${fmt(topStrat.simulation.cashImprovement)})` : ''}`,
+            action: topStrat.actionRecommendation || 'Review operational levers in the Cash Preservation Playbook to resolve this pressure.',
+            created_at: now,
+          });
+        }
+      }
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({
