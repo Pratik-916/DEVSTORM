@@ -680,14 +680,14 @@ This layer synthesizes commitments, safety buffers, and multi-window cash obliga
 
 ### Payment Readiness Status Definitions
 Each evaluated upcoming payment obligation is categorized into one of three deterministic statuses:
-- **`READY`**: Current Available Cash covers the payment, AND the remaining cash balance after payment meets or exceeds the required safety buffer (15% of Available Cash, minimum ₹500).
-- **`WATCH`**: Current Available Cash covers the payment amount, BUT the remaining cash balance after payment drops below the required safety buffer.
+- **`READY`**: Current Available Cash covers the payment, AND the remaining cash balance after payment meets or exceeds the established safety buffer.
+- **`WATCH`**: Current Available Cash covers the payment amount, BUT the remaining cash balance after payment drops below the established safety buffer.
 - **`NOT COVERED`**: Current Available Cash is less than the payment amount, creating an immediate liquid shortfall.
 
 ### Cash Reserve Planning Metrics
-The reserve planning module computes four explainable metrics:
-1. **Safety Buffer**: 15% of current Available Cash (floor: ₹500, capped at Available Cash).
-2. **Obligation Reserve**: Total essential scheduled commitments due within the next 7 days.
+Required Reserve is a planning metric derived directly from Cashly's verified financial concepts:
+1. **Safety Buffer**: The established safety buffer provided by `CashflowIntelligence`.
+2. **Obligation Reserve**: Essential upcoming scheduled commitments due within the defined planning window.
 3. **Required Reserve**: Obligation Reserve + Safety Buffer.
 4. **Cash Above Reserve / Reserve Shortfall**: Available Cash - Required Reserve. If negative, indicates a reserve shortfall.
 

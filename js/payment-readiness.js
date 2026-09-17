@@ -27,9 +27,25 @@ const PaymentReadinessEngine = (() => {
 
   /* ----------------------------------------------------------
      CONFIGURATION & CONSTANTS
-     Reuses verified constants from CashflowIntelligence (cashflow.js)
+     Reuses verified safety buffer from CashflowIntelligence (cashflow.js)
      ---------------------------------------------------------- */
-  const SAFETY_BUFFER_RATE = 0.15; // 15% of Available Cash
+  function _getSafetyBuffer(options = {}, availableCash = 0) {
+    if (options.safetyBuffer !== undefined) {
+      return Math.max(0, Number(options.safetyBuffer) || 0);
+    }
+    const effCash = options.availableCash !== undefined ? Math.max(0, Number(options.availableCash) || 0) : availableCash;
+    if (typeof CashflowIntelligence !== 'undefined' && typeof CashflowIntelligence.compute === 'function') {
+      const intelOpts = Object.assign({}, options, {
+        summaryOverride: Object.assign({ availableCash: effCash }, options.summaryOverride || {}),
+        paymentsOverride: options.paymentsOverride || options.commitmentsOverride || options.commitments,
+      });
+      const intel = CashflowIntelligence.compute(intelOpts);
+      if (typeof intel.safetyBuffer === 'number') {
+        return Math.max(0, intel.safetyBuffer);
+      }
+    }
+    return 0;
+  }
 
   const WINDOW_DAYS = {
     THREE:    3,
@@ -133,16 +149,13 @@ const PaymentReadinessEngine = (() => {
           ? deduped.reduce((s, p) => s + (Number(p.amount) || 0), 0)
           : (summary.upcomingObligations ? Math.max(0, Number(summary.upcomingObligations) || 0) : deduped.reduce((s, p) => s + (Number(p.amount) || 0), 0)));
 
-    // Existing formula from CashflowIntelligence / data.js:
-    // Essential obligations take priority; otherwise 60% of upcoming obligations is reserved
+    // Essential upcoming commitments (priority essential or high, or unprioritized commitments)
     const essentialDue = deduped
-      .filter(p => p.priority === 'essential' || p.priority === 'high')
+      .filter(p => !p.priority || p.priority === 'essential' || p.priority === 'high')
       .reduce((s, p) => s + (Number(p.amount) || 0), 0);
 
-    const obligationReserve = essentialDue > 0 ? essentialDue : Math.round(upcomingObligations * 0.6);
-    const safetyBuffer = options.safetyBuffer !== undefined
-      ? Math.max(0, Number(options.safetyBuffer) || 0)
-      : Math.round(availableCash * SAFETY_BUFFER_RATE);
+    const obligationReserve = essentialDue;
+    const safetyBuffer = _getSafetyBuffer(options, availableCash);
 
     // Required planning reserve target
     const requiredReserve = obligationReserve + safetyBuffer;
@@ -189,9 +202,8 @@ const PaymentReadinessEngine = (() => {
     const availableCash = options.availableCash !== undefined
       ? Math.max(0, Number(options.availableCash) || 0)
       : Math.max(0, Number(summary.availableCash) || 0);
-    const safetyBuffer = options.safetyBuffer !== undefined
-      ? Math.max(0, Number(options.safetyBuffer) || 0)
-      : Math.round(availableCash * SAFETY_BUFFER_RATE);
+
+    const safetyBuffer = _getSafetyBuffer(options, availableCash);
 
     // Safe zero handling
     if (amount === 0) {
@@ -224,7 +236,7 @@ const PaymentReadinessEngine = (() => {
 
     // Condition 2: Watch (Covered by available cash, but cuts into safety buffer)
     const remainingAfter = availableCash - amount;
-    if (remainingAfter < safetyBuffer) {
+    if (safetyBuffer > 0 && remainingAfter < safetyBuffer) {
       return {
         status: 'WATCH',
         isCovered: true,
@@ -233,7 +245,7 @@ const PaymentReadinessEngine = (() => {
         safetyBuffer,
         remainingAfter,
         shortfall: 0,
-        explanation: `WATCH: This payment of ${fmt(amount)} is covered by available cash (${fmt(availableCash)}), but paying it leaves ${fmt(remainingAfter)}, which falls below your safety cushion and safety buffer (${fmt(safetyBuffer)}).`,
+        explanation: `WATCH: This payment of ${fmt(amount)} is covered by available cash (${fmt(availableCash)}), but paying it leaves ${fmt(remainingAfter)}, which falls below your established safety buffer (${fmt(safetyBuffer)}).`,
       };
     }
 
@@ -246,7 +258,7 @@ const PaymentReadinessEngine = (() => {
       safetyBuffer,
       remainingAfter,
       shortfall: 0,
-      explanation: `READY: Available cash covers this payment of ${fmt(amount)} and your remaining cash (${fmt(remainingAfter)}) stays at or above the safety buffer and safety rules (${fmt(safetyBuffer)}).`,
+      explanation: `READY: Available cash covers this payment of ${fmt(amount)} and your remaining cash (${fmt(remainingAfter)}) stays at or above safety rules (${fmt(safetyBuffer)}).`,
     };
   }
 
@@ -268,9 +280,8 @@ const PaymentReadinessEngine = (() => {
     const availableCash = options.availableCash !== undefined
       ? Math.max(0, Number(options.availableCash) || 0)
       : Math.max(0, Number(summary.availableCash) || 0);
-    const safetyBuffer = options.safetyBuffer !== undefined
-      ? Math.max(0, Number(options.safetyBuffer) || 0)
-      : Math.round(availableCash * SAFETY_BUFFER_RATE);
+
+    const safetyBuffer = _getSafetyBuffer(options, availableCash);
 
     let expectedIncoming = 0;
     let expectedOutgoing = 0;
@@ -670,7 +681,6 @@ const PaymentReadinessEngine = (() => {
     setActiveWindowDays,
     render,
     WINDOW_DAYS,
-    SAFETY_BUFFER_RATE,
   };
 })();
 

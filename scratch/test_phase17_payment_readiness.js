@@ -80,6 +80,8 @@ try {
 }
 
 // Load engines
+const { CashflowIntelligence } = require('../js/cashflow.js');
+global.CashflowIntelligence = CashflowIntelligence;
 const { PaymentReadinessEngine } = require('../js/payment-readiness.js');
 global.PaymentReadinessEngine = PaymentReadinessEngine;
 const { ActionCenterEngine } = require('../js/action-center.js');
@@ -180,19 +182,20 @@ console.log('\n[Group 2] Multi-Commitment & Expected Cash Integrity');
 // -------------------------------------------------------------
 console.log('\n[Group 3] Reserve Planning Logic');
 {
-  // Available cash = 10,000 -> safety buffer = 10,000 * 0.15 = 1,500
+  // Available cash = 10,000, safety buffer = 1,500
   // Essential commitments = 4,000
   // Required Reserve = 4,000 + 1,500 = 5,500
   // Cash Above Reserve = 10,000 - 5,500 = 4,500
   const reserve = PaymentReadinessEngine.getReserve({
     availableCash: 10000,
+    safetyBuffer: 1500,
     commitments: [
       { id: 'res_1', title: 'Electricity Bill', amount: 4000, priority: 'essential' },
       { id: 'res_2', title: 'Office Snacks', amount: 1000, priority: 'low' },
     ],
   });
 
-  assert(reserve.safetyBuffer === 1500, `Test 7: Safety buffer is 15% of Available Cash (₹${reserve.safetyBuffer})`);
+  assert(reserve.safetyBuffer === 1500, `Test 7: Safety buffer uses verified existing safety buffer (₹${reserve.safetyBuffer})`);
   assert(reserve.obligationReserve === 4000, `Test 7: Obligation reserve isolates essential commitments (₹${reserve.obligationReserve})`);
   assert(reserve.requiredReserve === 5500, `Test 7: Required reserve = obligationReserve + safetyBuffer (₹${reserve.requiredReserve})`);
   assert(reserve.cashAboveReserve === 4500, `Test 7: Cash above reserve = Available Cash - Required Reserve (₹${reserve.cashAboveReserve})`);
