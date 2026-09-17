@@ -550,3 +550,57 @@
   }
 }
 
+/* ============================================================
+   PHASE 17: PAYMENT READINESS & CASH RESERVE PLANNING
+   ============================================================ */
+.readiness-commitment-item {
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+
+.readiness-commitment-item:hover {
+  background: var(--c-bg-subtle, #f8fafc) !important;
+}
+
+.btn-readiness-window {
+  transition: all var(--t-fast);
+}
+
+.badge-ready {
+  background: var(--c-success-light, #dcfce7);
+  color: var(--c-success, #16a34a);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+.badge-watch {
+  background: var(--c-warning-light, #fef9c3);
+  color: var(--c-warning, #ca8a04);
+  border: 1px solid rgba(202, 138, 4, 0.2);
+}
+
+.badge-not-covered {
+  background: var(--c-danger-light, #fee2e2);
+  color: var(--c-danger, #dc2626);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+@media (max-width: 767px) {
+  .readiness-summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 479px) {
+  .readiness-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .readiness-window-pills {
+    width: 100%;
+    display: flex;
+    justify-content: stretch;
+  }
+  .readiness-window-pills button {
+    flex: 1;
+    text-align: center;
+  }
+}
+

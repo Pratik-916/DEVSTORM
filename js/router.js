@@ -73,6 +73,9 @@ const Router = (() => {
       if (typeof CashflowCalendarEngine !== 'undefined' && typeof CashflowCalendarEngine.render === 'function') {
         CashflowCalendarEngine.render('insights-calendar-container');
       }
+      if (typeof PaymentReadinessEngine !== 'undefined' && typeof PaymentReadinessEngine.render === 'function') {
+        PaymentReadinessEngine.render('insights-readiness-container');
+      }
       if (typeof Advisor !== 'undefined') {
         Advisor.render();
       }

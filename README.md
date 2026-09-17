@@ -658,7 +658,62 @@ When all monitored cashflow conditions are within normal thresholds, Action Cent
 
 ---
 
-## 14. Local Development Setup
+## 14. Phase 17: Payment Readiness & Cash Reserve Planning
+
+Phase 17 introduces the **Payment Readiness & Cash Reserve Planning** layer (`js/payment-readiness.js`), an explainable decision-support framework answering two fundamental micro-merchant financial questions:
+> *"Can I safely cover my upcoming payments, and how much cash should I keep reserved?"*
+
+This layer synthesizes commitments, safety buffers, and multi-window cash obligations into clear readiness statuses and reserve metrics on the Insights dashboard.
+
+### Architectural Principles & Read-Only Guarantees
+- **Pure Visibility & Analytics Layer**: `PaymentReadinessEngine` is strictly 100% read-only. It never creates, edits, or deletes transactions, obligations, budgets, or goals.
+- **No Second Forecast Engine**: Reuses `CashflowEngine`, `CashflowIntelligence`, and `CashflowCalendarEngine` without inventing parallel cashflow projection models.
+- **Strict Read-Only Guarantee**: Zero database writes, zero financial mutations, zero `localStorage` as financial source of truth.
+- **Zero AI Dependencies & Deterministic**: Rule-based calculation and deterministic status categorization; no external AI APIs or secret keys.
+- **Tenant Isolation**: Operates strictly within authenticated business context, preserving existing RLS and data isolation boundaries.
+
+### Critical Financial Invariants
+> [!IMPORTANT]
+> - **Pending Money is NOT Available Cash**: Pending digital settlements awaiting bank clearance are tracked in projected windows, but are **never added to current Available Cash**.
+> - **Window Starting Cash is Current Available Cash**: Multi-window analysis starts strictly with verified liquid `Available Cash`.
+> - **Safe to Spend Semantic Harmony**: Payment readiness status calculation respects existing Safe to Spend rules rather than using conflicting reserve floors.
+
+### Payment Readiness Status Definitions
+Each evaluated upcoming payment obligation is categorized into one of three deterministic statuses:
+- **`READY`**: Current Available Cash covers the payment, AND the remaining cash balance after payment meets or exceeds the required safety buffer (15% of Available Cash, minimum ₹500).
+- **`WATCH`**: Current Available Cash covers the payment amount, BUT the remaining cash balance after payment drops below the required safety buffer.
+- **`NOT COVERED`**: Current Available Cash is less than the payment amount, creating an immediate liquid shortfall.
+
+### Cash Reserve Planning Metrics
+The reserve planning module computes four explainable metrics:
+1. **Safety Buffer**: 15% of current Available Cash (floor: ₹500, capped at Available Cash).
+2. **Obligation Reserve**: Total essential scheduled commitments due within the next 7 days.
+3. **Required Reserve**: Obligation Reserve + Safety Buffer.
+4. **Cash Above Reserve / Reserve Shortfall**: Available Cash - Required Reserve. If negative, indicates a reserve shortfall.
+
+### Multi-Window Commitments & Projection Analysis
+Evaluates outgoing commitments and expected cashflow across four distinct planning horizons:
+- **Next 3 Days**: Immediate payment commitments and settlement outlook.
+- **Next 7 Days** (Default): Weekly obligation reserve horizon.
+- **Next 14 Days**: Short-term liquidity horizon.
+- **Next 30 Days**: Full monthly liquidity outlook.
+
+For each window, computes:
+- Expected Outgoing Payments
+- Expected Incoming Settlements
+- Projected Ending Cash Balance (Available Cash + Expected Incoming - Expected Outgoing)
+
+### Action Center & Cashly Advisor Integration
+- **Action Center (Signal 9)**: Surfaces critical/high priority actions when an upcoming payment is `NOT COVERED` or an urgent obligation exceeds Available Cash.
+- **Cashly Advisor (Rule 22 - Reserve Planning Shortfall)**: Triggers an explainable warning when total Required Reserve exceeds current Available Cash, detailing exact shortfall amounts and recommended cash preservation steps.
+
+### Application Versioning
+- Application release upgraded from **v1.1** to **v1.2** (Phase 17 completed).
+- Service Worker offline cache updated from `cashly-cache-v6` to `cashly-cache-v7` with full offline support for `js/payment-readiness.js`.
+
+---
+
+## 15. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
@@ -692,7 +747,7 @@ When all monitored cashflow conditions are within normal thresholds, Action Cent
 
 ---
 
-## 15. Deployment (Vercel / Netlify)
+## 16. Deployment (Vercel / Netlify)
 
 Cashly is built as a pure, zero-build client application that deploys directly to static hosting platforms.
 
@@ -704,7 +759,7 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 16. Current Limitations
+## 17. Current Limitations
 
 1. **Simulated Digital Feeds**: Provider feed ingestion simulates real-world transaction patterns rather than connecting directly to live banking APIs.
 2. **Email Verification**: Supabase Email/Password authentication is configured for direct sign-in for seamless micro-merchant onboarding without mandatory SMS OTP verification.
@@ -714,6 +769,6 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 
 ---
 
-## 17. License
+## 18. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

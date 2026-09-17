@@ -860,6 +860,33 @@ const CashlyAdvisor = (() => {
       }
     }
 
+    // PHASE 17: PAYMENT READINESS & RESERVE SHORTFALL (Rule 22)
+    const readinessEngine = (typeof PaymentReadinessEngine !== 'undefined')
+      ? PaymentReadinessEngine
+      : ((typeof window !== 'undefined' && window.PaymentReadinessEngine)
+          ? window.PaymentReadinessEngine
+          : ((typeof global !== 'undefined' && global.PaymentReadinessEngine) ? global.PaymentReadinessEngine : null));
+
+    const readinessData = (readinessEngine && typeof readinessEngine.getReserve === 'function')
+      ? readinessEngine.getReserve({ summaryOverride: s, paymentsOverride: payments })
+      : null;
+
+    if (readinessData && !readinessData.isReserveCovered && readinessData.reserveShortfall > 0) {
+      const isCritical = readinessData.reserveShortfall > (availableCash * 0.5) || availableCash <= 0;
+      recs.push({
+        id: 'reserve_planning_shortfall',
+        type: 'reserve_shortfall',
+        priority: isCritical ? 'high' : 'medium',
+        severity: isCritical ? 'risk' : 'caution',
+        icon: isCritical ? iconRisk() : iconCaution(),
+        title: 'Available cash is below required planning reserve',
+        message: `Planning reserve requires ${fmt(readinessData.requiredReserve)}, leaving a shortfall of ${fmt(readinessData.reserveShortfall)}.`,
+        reason: `What happened: Required planning reserve is ${fmt(readinessData.requiredReserve)} (${fmt(readinessData.obligationReserve)} obligations + ${fmt(readinessData.safetyBuffer)} safety cushion), but Available Cash is ${fmt(availableCash)}. When: Immediate planning target. Why it matters: Operating without the full planning reserve leaves your business vulnerable if customer receipts are delayed or an unexpected expense occurs. Metric/Event: Reserve shortfall = ${fmt(readinessData.reserveShortfall)} (${fmt(readinessData.requiredReserve)} required vs ${fmt(availableCash)} available).`,
+        action: 'Hold non-essential discretionary expenses until confirmed customer payments clear into your account.',
+        created_at: now,
+      });
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({

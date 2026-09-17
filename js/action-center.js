@@ -554,6 +554,63 @@ const ActionCenterEngine = (() => {
       }
     });
 
+    /* ----------------------------------------------------------
+       SIGNAL 9: PAYMENT READINESS SIGNALS (Phase 17)
+       ---------------------------------------------------------- */
+    let readiness = options.readinessOverride || null;
+    if (!readiness && typeof PaymentReadinessEngine !== 'undefined' && typeof PaymentReadinessEngine.compute === 'function') {
+      readiness = PaymentReadinessEngine.compute({
+        referenceDate: refDate,
+        summaryOverride: summary,
+        paymentsOverride: payments,
+        transactionsOverride: txns,
+        calendarOverride: calendar,
+      });
+    }
+
+    if (readiness && readiness.reserve) {
+      const resData = readiness.reserve;
+      if (!resData.isReserveCovered && resData.reserveShortfall > 0) {
+        const actionKey = 'reserve_shortfall';
+        const isSevere = resData.reserveShortfall > (availableCash * 0.5) || availableCash <= 0;
+        addOrMergeCandidate(actionKey, {
+          id: 'act_reserve_shortfall',
+          type: 'cash_pressure',
+          priority: isSevere ? 'critical' : 'high',
+          title: 'Required cash reserve exceeds available cash',
+          description: `WHAT: Planning reserve target of ${fmt(resData.requiredReserve)} exceeds current available cash by ${fmt(resData.reserveShortfall)}.`,
+          reason: `WHY: Upcoming essential commitments (${fmt(resData.obligationReserve)}) and your safety cushion (${fmt(resData.safetyBuffer)}) require more liquid cash than is currently settled.`,
+          metric: `METRIC: Reserve target = ${fmt(resData.requiredReserve)} vs Available Cash = ${fmt(availableCash)} (Shortfall: ${fmt(resData.reserveShortfall)})`,
+          source: 'obligation',
+          dueDate: null,
+          amount: resData.reserveShortfall,
+          status: 'active',
+        });
+      }
+
+      if (Array.isArray(readiness.signals)) {
+        readiness.signals.forEach(sig => {
+          if (sig.type === 'payment_not_covered' && sig.commitmentId) {
+            const cleanId = sig.commitmentId.replace('ob_', '').replace('rec_exp_', '');
+            const actionKey = `payment_${cleanId}`;
+            addOrMergeCandidate(actionKey, {
+              id: `act_${actionKey}`,
+              type: 'upcoming_payment',
+              priority: 'critical',
+              title: `${sig.title || 'Payment obligation'} is not covered`,
+              description: `WHAT: ${sig.explanation}`,
+              reason: `WHY: Current available cash is insufficient to cover this upcoming payment.`,
+              metric: `METRIC: Shortfall = ${fmt(sig.shortfall)} | Due: ${sig.dueDate || 'Unscheduled'}`,
+              source: 'obligation',
+              dueDate: sig.dueDate,
+              amount: sig.amount,
+              status: 'active',
+            });
+          }
+        });
+      }
+    }
+
     // 5. Convert candidate map to array & apply deterministic sorting
     const allActions = Array.from(candidateMap.values());
 
