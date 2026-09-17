@@ -1064,6 +1064,54 @@ const CashlyAdvisor = (() => {
       }
     }
 
+    // PHASE 22: RECEIVABLES & COLLECTIONS INTELLIGENCE (Rule 27)
+    {
+      let collectionsEngine = (typeof CollectionsEngine !== 'undefined')
+        ? CollectionsEngine
+        : ((typeof window !== 'undefined' && window.CollectionsEngine) ? window.CollectionsEngine : null);
+
+      if (!collectionsEngine && typeof require !== 'undefined') {
+        try { collectionsEngine = require('./collections.js').CollectionsEngine; } catch (e) {}
+      }
+
+      if (collectionsEngine && typeof collectionsEngine.compute === 'function') {
+        const coll = collectionsEngine.compute({
+          referenceDate: opts.referenceDate,
+          transactionsOverride: txns,
+        });
+
+        const collSummary = coll && coll.summary ? coll.summary : null;
+
+        if (collSummary && collSummary.overdueCount > 0) {
+          recs.push({
+            id: 'collections_overdue',
+            type: 'collections_intelligence',
+            priority: 'high',
+            severity: 'risk',
+            icon: iconRisk(),
+            title: `${fmt(collSummary.overdueAmount)} in digital sales is overdue for collection`,
+            message: `${collSummary.overdueCount} digital receivable(s) totaling ${fmt(collSummary.overdueAmount)} have been pending beyond the overdue window (>5 days).`,
+            reason: `WHAT: ${collSummary.overdueCount} digital sale(s) totaling ${fmt(collSummary.overdueAmount)} are overdue (>5 days) and remain excluded from Available Cash. WHY: Unsettled receivables cannot be spent, reducing your liquid buffer and safe-to-spend capacity. HOW: Review your merchant gateway and bank deposit records, then confirm received funds through Reconcile Settlements. Cashly does not guarantee that these funds will arrive.`,
+            action: 'Check your gateway or bank for overdue deposit records. Mark confirmed items via Reconcile Settlements.',
+            created_at: now,
+          });
+        } else if (collSummary && collSummary.delayedCount > 0) {
+          recs.push({
+            id: 'collections_delayed',
+            type: 'collections_intelligence',
+            priority: 'medium',
+            severity: 'caution',
+            icon: iconCaution(),
+            title: `${fmt(collSummary.delayedAmount)} in digital sales is delayed`,
+            message: `${collSummary.delayedCount} digital receivable(s) totaling ${fmt(collSummary.delayedAmount)} have been pending for 3–5 days without confirmed settlement.`,
+            reason: `WHAT: ${collSummary.delayedCount} digital sale(s) totaling ${fmt(collSummary.delayedAmount)} are in the delayed window (3–5 days) and remain excluded from Available Cash. WHY: Extended pending periods reduce cash visibility and can mask a tighter-than-expected Available Cash position. HOW: Cross-check your gateway or bank statement. If funds are received, confirm via Reconcile Settlements. Cashly does not guarantee payment arrival.`,
+            action: 'Monitor gateway payouts. Reconcile any confirmed deposits in Cashly\'s settlement workflow.',
+            created_at: now,
+          });
+        }
+      }
+    }
+
     // FALLBACK IF EMPTY
     if (recs.length === 0) {
       recs.push({

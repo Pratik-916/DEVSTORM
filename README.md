@@ -931,7 +931,96 @@ Ages each pending digital transaction by calendar days relative to today:
 
 ---
 
-## 19. Local Development Setup
+## 19. Receivables & Collections Intelligence (Phase 22)
+
+Phase 22 builds a deterministic, explainable **Collections Intelligence** layer on top of the Phase 21 settlement lifecycle. It turns pending digital receivables into an organized, priority-ranked collection queue with hypothetical cash-unlock projections.
+
+### Architecture
+
+| File | Role |
+|---|---|
+| `js/collections.js` | `CollectionsEngine` — pure read-only analytics engine |
+| `js/advisor.js` | Rule 27 (`collections_overdue` / `collections_delayed`) |
+| `js/action-center.js` | Signal 14 (merges with Signal 13 via `settlement_aging` deduplication key) |
+| `js/data.js` | `refreshAllViews()` now calls `CollectionsEngine.render()` |
+| `index.html` | `#insights-collections-container` on Insights page |
+
+### Core Functionality
+
+**1. Receivables Queue** — deterministic, sorted list of all pending digital sales:
+- ID, description, date, channel, payment method, amount, age in calendar days, aging category
+- Sorted: OVERDUE → DELAYED → ON_SCHEDULE; within each tier: oldest first, then largest amount
+
+**2. Collections Summary** — aggregate metrics derived from real transaction data:
+- Total Pending, On Schedule (0–2d), Delayed (3–5d), Overdue (>5d)
+- Count and amount for each category
+- Oldest pending age, largest single receivable
+
+**3. Cash Unlock View (Hypothetical)** — informational projection only:
+- "If all pending settle: +₹X" — hypothetical, NOT Available Cash
+- "If delayed settle: +₹Y" — hypothetical, NOT Available Cash
+- "If overdue settle: +₹Z" — hypothetical, NOT Available Cash
+- Current Available Cash (from existing CashflowEngine — never manually altered)
+
+**4. Collection Priority** — deterministic ranking:
+- OVERDUE > DELAYED > ON_SCHEDULE
+- Within tier: older age ranks higher, then larger amount
+- No arbitrary rupee thresholds introduced
+
+**5. Explainability** — every item exposes:
+- **WHAT**: description and amount of the receivable
+- **WHY**: explanation of why it is excluded from Available Cash
+- **HOW**: action to take in Cashly's existing settlement workflow
+
+### Financial Integrity & Disclaimer
+
+> **Pending receivables are NOT Available Cash.**
+> **Potential Cash Unlock is hypothetical.**
+> **Cashly does not guarantee payment arrival.**
+> **Actual settlement must go through the existing settlement workflow (Reconcile Settlements).**
+
+- Available Cash is NEVER manually altered by CollectionsEngine.
+- Settlement status is NEVER automatically changed.
+- Transaction amounts and dates are NEVER modified.
+- Pending receivables remain excluded from Available Cash until confirmed via Phase 21 settlement.
+
+### Aging Definitions (Reused from Phase 21)
+
+| Category | Age | Meaning |
+|---|---|---|
+| ON_SCHEDULE | 0–2 calendar days | Within standard clearance window |
+| DELAYED | 3–5 calendar days | Settlement expected but not yet confirmed |
+| OVERDUE | >5 calendar days | Beyond standard clearance; requires active follow-up |
+
+### Action Center Integration
+
+**Signal 14 (`collections_pressure`)** — new signal for delayed receivables only:
+- Fires when `delayedCount > 0` AND Signal 13 (`settlement_aging`) is NOT already present in the candidate map
+- Deduplicates against Signal 13: overdue receivables merge into the existing `settlement_aging` slot
+
+No new dismissal system. Uses existing Action Center: priority system, deduplication, dismissal, max 5 primary, critical protection.
+
+### Advisor Integration
+
+**Rule 27 (`collections_overdue` / `collections_delayed`)** — consumes `CollectionsEngine.compute()` output:
+- `collections_overdue` (high, risk): fires when `overdueCount > 0`
+- `collections_delayed` (medium, caution): fires when `delayedCount > 0` and no overdue items
+- WHAT/WHY/HOW structure, explicit disclaimer: "Cashly does not guarantee payment arrival"
+
+### Security & Data Integrity
+
+- No new Supabase tables.
+- No localStorage state.
+- No service-role key exposure.
+- All data derived from existing `AppState.getTransactions()` — same RLS-protected pipeline.
+
+### Application Versioning
+- Application release upgraded from **v1.6** to **v1.7** (Phase 22 completed).
+- Service Worker offline cache updated from `cashly-cache-v11` to `cashly-cache-v12` with full offline support for `js/collections.js`.
+
+---
+
+## 20. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)

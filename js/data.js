@@ -467,6 +467,9 @@ const AppState = (() => {
     if (typeof AlertEngine !== 'undefined' && typeof AlertEngine.evaluate === 'function') {
       AlertEngine.evaluate();
     }
+    if (typeof CollectionsEngine !== 'undefined' && typeof CollectionsEngine.render === 'function') {
+      CollectionsEngine.render('insights-collections-container');
+    }
   }
 
   /* ---- Financial Accounts ---- */

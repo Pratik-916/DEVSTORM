@@ -763,6 +763,65 @@ const ActionCenterEngine = (() => {
       });
     }
 
+    /* ----------------------------------------------------------
+       SIGNAL 14: COLLECTIONS INTELLIGENCE (Phase 22)
+       Surfaces overdue/delayed receivables that are NOT already
+       covered by Signal 13 (settlement aging). Deduplicates
+       against settlement_aging key for overdue items so that the
+       same financial situation is not double-counted.
+       ---------------------------------------------------------- */
+    let collectionsEngine = (typeof CollectionsEngine !== 'undefined')
+      ? CollectionsEngine
+      : ((typeof window !== 'undefined' && window.CollectionsEngine)
+          ? window.CollectionsEngine
+          : ((typeof global !== 'undefined' && global.CollectionsEngine) ? global.CollectionsEngine : null));
+
+    if (!collectionsEngine && typeof require !== 'undefined') {
+      try { collectionsEngine = require('./collections.js').CollectionsEngine; } catch (e) {}
+    }
+
+    if (collectionsEngine && typeof collectionsEngine.compute === 'function') {
+      const collResult = collectionsEngine.compute({
+        referenceDate: refDate,
+        transactionsOverride: txns,
+      });
+
+      const cs = collResult && collResult.summary ? collResult.summary : null;
+
+      if (cs && cs.overdueCount > 0) {
+        // Overdue receivables: merge into 'settlement_aging' key (same dedup slot as Signal 13)
+        // so we don't create two separate cards for the same financial state.
+        addOrMergeCandidate('settlement_aging', {
+          id: 'act_settlement_aging',
+          type: 'pending_settlement',
+          priority: 'high',
+          title: `${fmt(cs.overdueAmount)} in digital receivables is overdue (>5 days)`,
+          description: `WHAT: ${cs.overdueCount} digital sale(s) totaling ${fmt(cs.overdueAmount)} have exceeded the standard clearance window and remain excluded from Available Cash.`,
+          reason: `WHY: Overdue receivables reduce your effective liquid position. HOW: Check gateway or bank deposits and confirm via Reconcile Settlements.`,
+          metric: `METRIC: Overdue = ${fmt(cs.overdueAmount)} across ${cs.overdueCount} item(s) | Total pending = ${fmt(cs.totalPendingAmount)}`,
+          source: 'collections',
+          dueDate: null,
+          amount: cs.overdueAmount,
+          status: 'active',
+        });
+      } else if (cs && cs.delayedCount > 0 && !candidateMap.has('settlement_aging')) {
+        // Delayed receivables only surfaced if settlement_aging is not already present
+        addOrMergeCandidate('collections_pressure', {
+          id: 'act_collections_pressure',
+          type: 'pending_settlement',
+          priority: 'medium',
+          title: `${fmt(cs.delayedAmount)} in digital sales is delayed (3–5 days)`,
+          description: `WHAT: ${cs.delayedCount} digital sale(s) totaling ${fmt(cs.delayedAmount)} have been pending for 3–5 days without confirmed settlement.`,
+          reason: `WHY: Delayed receivables remain excluded from Available Cash, reducing safe-to-spend headroom. HOW: Monitor gateway payouts and reconcile confirmed deposits.`,
+          metric: `METRIC: Delayed = ${fmt(cs.delayedAmount)} across ${cs.delayedCount} item(s) | Total pending = ${fmt(cs.totalPendingAmount)}`,
+          source: 'collections',
+          dueDate: null,
+          amount: cs.delayedAmount,
+          status: 'active',
+        });
+      }
+    }
+
     // 5. Convert candidate map to array & apply deterministic sorting
     const allActions = Array.from(candidateMap.values());
 
