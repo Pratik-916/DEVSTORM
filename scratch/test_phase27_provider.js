@@ -249,9 +249,11 @@ group('Group 17: RLS schema assertions', () => {
   assert(schemaSrc.includes("DEFAULT 'INR'"),                     'currency default INR');
   assert(schemaSrc.includes('metadata JSONB'),                    'metadata JSONB');
   assert(schemaSrc.includes('provider_account_id'),               'provider_account_id added');
-  assert(schemaSrc.includes('updated_at'),                        'updated_at added');
   assert(schemaSrc.includes('idx_financial_accounts_provider_account_id'), 'provider_account_id index');
   assert(schemaSrc.includes('idx_financial_accounts_connection_status'),   'connection_status index');
+  assert(schemaSrc.includes('chk_financial_accounts_connection_status'),   'connection_status CHECK constraint defined');
+  assert(schemaSrc.includes("'CONNECT_FAILED'") && schemaSrc.includes("'SYNC_FAILED'"), 'CHECK constraint covers Phase 27 lifecycle states');
+  assert(schemaSrc.includes("'ERROR'") && schemaSrc.includes("'CONSENT_REQUIRED'"), 'CHECK constraint covers Phase 9 legacy states');
 });
 
 group('Group 18: Credential / secret safety', () => {

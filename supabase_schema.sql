@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS public.financial_accounts (
 -- Phase 9: Financial account provider metadata for connection lifecycle & external ID mapping
 ALTER TABLE public.financial_accounts
 ADD COLUMN IF NOT EXISTS external_account_id TEXT,
-ADD COLUMN IF NOT EXISTS connection_status TEXT DEFAULT 'disconnected',
+ADD COLUMN IF NOT EXISTS connection_status TEXT DEFAULT 'DISCONNECTED',
 ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ;
 
 -- 4. UPCOMING OBLIGATIONS TABLE
@@ -321,11 +321,31 @@ ADD COLUMN IF NOT EXISTS provider_account_id TEXT;
 ALTER TABLE public.financial_accounts
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
--- NOTE: We do NOT add a CHECK constraint to connection_status here because
--- existing rows may contain legacy values ('ERROR', 'CONSENT_REQUIRED', etc.)
--- from Phase 9. The valid lifecycle values are documented in provider.js:
+-- Normalize any existing legacy lowercase connection_status values safely
+UPDATE public.financial_accounts
+SET connection_status = UPPER(connection_status)
+WHERE connection_status IS NOT NULL AND connection_status != UPPER(connection_status);
+
+-- Database-level CHECK constraint for connection_status lifecycle states.
+-- Supported lifecycle states:
 --   DISCONNECTED, CONNECTING, CONSENT_REQUIRED, CONNECTED,
 --   SYNCING, ERROR, CONNECT_FAILED, SYNC_FAILED
+-- Note: 'ERROR' and 'CONSENT_REQUIRED' are preserved for Phase 9 legacy row compatibility.
+ALTER TABLE public.financial_accounts
+DROP CONSTRAINT IF EXISTS chk_financial_accounts_connection_status;
+
+ALTER TABLE public.financial_accounts
+ADD CONSTRAINT chk_financial_accounts_connection_status
+CHECK (connection_status IN (
+    'DISCONNECTED',
+    'CONNECTING',
+    'CONSENT_REQUIRED',
+    'CONNECTED',
+    'SYNCING',
+    'ERROR',
+    'CONNECT_FAILED',
+    'SYNC_FAILED'
+));
 
 -- Phase 27 Performance Indexes
 
