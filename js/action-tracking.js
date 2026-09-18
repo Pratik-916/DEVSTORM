@@ -619,12 +619,16 @@ const ActionTrackingEngine = (() => {
           iconSvg = iconLow();
         }
 
+        // Clean WHY / METRIC prefixes so labels are never duplicated
+        const reasonText = String(act.reason || '').replace(/^WHY:\s*/i, '').trim();
+        const metricText = String(act.metric || '').replace(/^METRIC:\s*/i, '').trim();
+
         // Status badge
         let statusBadge = '';
         if (act.status === STATUS.IN_PROGRESS) {
           statusBadge = `<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">In Progress</span>`;
         } else if (act.status === STATUS.COMPLETED) {
-          statusBadge = `<span class="badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">Completed</span>`;
+          statusBadge = `<span class="badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;" title="Marked as completed by merchant. Real financial records remain unchanged.">Completed</span>`;
         } else if (act.status === STATUS.DISMISSED) {
           statusBadge = `<span class="badge" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">Dismissed</span>`;
         } else {
@@ -663,7 +667,7 @@ const ActionTrackingEngine = (() => {
           `;
         } else if (act.status === STATUS.COMPLETED) {
           actionControlsHtml = `
-            <span style="font-size:10px;color:var(--c-text-muted);">Done ${act.completedAt ? new Date(act.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+            <span style="font-size:10px;color:var(--c-text-muted);" title="Marked as completed by merchant. Does not imply automated verification of payments or settlements.">Done by merchant ${act.completedAt ? new Date(act.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
             <button type="button" class="btn btn-sm btn-ghost btn-action-reopen" data-action-id="${act.id}" style="font-size:11px;padding:3px 8px;display:inline-flex;align-items:center;gap:4px;" title="Reopen action">
               ${iconReopen()} <span>Reopen</span>
             </button>
@@ -689,42 +693,43 @@ const ActionTrackingEngine = (() => {
 
         return `
           <div class="action-card" data-action-id="${act.id}" data-action-status="${act.status}"
-            style="background:${cardBg};border:1px solid ${cardBorder};border-radius:var(--r-md);padding:var(--sp-3);display:flex;flex-direction:column;gap:8px;position:relative;">
+            style="background:${cardBg};border:1px solid ${cardBorder};border-radius:var(--r-md);padding:var(--sp-3);display:flex;flex-direction:column;gap:8px;position:relative;max-width:100%;box-sizing:border-box;overflow-wrap:break-word;word-break:break-word;">
 
             <!-- Card Header -->
             <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <span class="badge ${badgeClass}" style="display:inline-flex;align-items:center;gap:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;">
+                <span class="badge ${badgeClass}" style="display:inline-flex;align-items:center;gap:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;flex-shrink:0;">
                   ${iconSvg}
                   ${act.priority}
                 </span>
                 ${statusBadge}
                 ${act.isHistorical ? `<span class="badge badge-settled" style="font-size:9px;">Historical</span>` : ''}
-                <strong style="font-size:var(--text-sm);color:var(--c-text-primary);">${act.title}</strong>
+                <strong style="font-size:var(--text-sm);color:var(--c-text-primary);overflow-wrap:break-word;word-break:break-word;">${act.title}</strong>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
                 ${act.amount ? `<span style="font-size:var(--text-sm);font-weight:700;color:var(--c-text-primary);">${fmt(act.amount)}</span>` : ''}
               </div>
             </div>
 
             <!-- Description (WHAT) -->
-            <p style="font-size:12px;color:var(--c-text-secondary);margin:0;line-height:1.5;">
+            <p style="font-size:12px;color:var(--c-text-secondary);margin:0;line-height:1.5;overflow-wrap:break-word;word-break:break-word;">
               ${act.description}
             </p>
 
             <!-- Detail Context (WHY / METRIC) -->
-            <div style="background:rgba(0,0,0,0.02);border-radius:var(--r-sm);padding:6px 10px;font-size:11px;color:var(--c-text-muted);display:flex;flex-direction:column;gap:3px;">
-              <div><strong style="color:var(--c-text-secondary);">Why:</strong> ${act.reason}</div>
-              <div><strong style="color:var(--c-text-secondary);">Metric:</strong> ${act.metric}</div>
+            <div style="background:rgba(0,0,0,0.02);border-radius:var(--r-sm);padding:6px 10px;font-size:11px;color:var(--c-text-muted);display:flex;flex-direction:column;gap:4px;overflow-wrap:break-word;word-break:break-word;">
+              ${reasonText ? `<div><strong style="color:var(--c-text-secondary);">WHY:</strong> ${reasonText}</div>` : ''}
+              ${metricText ? `<div><strong style="color:var(--c-text-secondary);">METRIC:</strong> ${metricText}</div>` : ''}
               ${act.notes ? `<div><strong style="color:var(--c-primary,#16a34a);">Note:</strong> ${act.notes}</div>` : ''}
+              ${act.status === STATUS.COMPLETED ? `<div style="font-size:10px;color:var(--c-text-muted);font-style:italic;">Merchant marked as completed &bull; Underlying financial records unchanged</div>` : ''}
             </div>
 
             <!-- Card Footer Controls -->
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:4px;border-top:1px solid rgba(0,0,0,0.05);">
-              <div style="display:flex;align-items:center;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 ${actionControlsHtml}
               </div>
-              <div style="display:flex;align-items:center;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 ${workflowBridgeHtml}
               </div>
             </div>

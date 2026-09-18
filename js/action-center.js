@@ -1033,13 +1033,13 @@ const ActionCenterEngine = (() => {
               </div>
             </div>
 
-            <p style="font-size:12px;color:var(--c-text-secondary);margin:0;line-height:1.5;">
+            <p style="font-size:12px;color:var(--c-text-secondary);margin:0;line-height:1.5;overflow-wrap:break-word;word-break:break-word;">
               ${act.description}
             </p>
 
-            <div style="background:rgba(0,0,0,0.02);border-radius:var(--r-sm);padding:6px 10px;font-size:11px;color:var(--c-text-muted);display:flex;flex-direction:column;gap:3px;">
-              <div><strong style="color:var(--c-text-secondary);">Why:</strong> ${act.reason}</div>
-              <div><strong style="color:var(--c-text-secondary);">Metric:</strong> ${act.metric}</div>
+            <div style="background:rgba(0,0,0,0.02);border-radius:var(--r-sm);padding:6px 10px;font-size:11px;color:var(--c-text-muted);display:flex;flex-direction:column;gap:3px;overflow-wrap:break-word;word-break:break-word;">
+              ${act.reason ? `<div><strong style="color:var(--c-text-secondary);">WHY:</strong> ${String(act.reason).replace(/^WHY:\s*/i, '').trim()}</div>` : ''}
+              ${act.metric ? `<div><strong style="color:var(--c-text-secondary);">METRIC:</strong> ${String(act.metric).replace(/^METRIC:\s*/i, '').trim()}</div>` : ''}
             </div>
           </div>
         `;

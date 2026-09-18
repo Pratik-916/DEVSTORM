@@ -385,6 +385,41 @@ try {
 assert(!threwRender, 'ActionTrackingEngine.render() executes safely without throwing in headless/missing DOM');
 
 // -------------------------------------------------------------
+// GROUP 12: LABEL DEDUPLICATION & WRAPPING AUDIT
+// -------------------------------------------------------------
+console.log('\n[Group 12] Label Deduplication & Text Wrapping');
+const fakeContainer = {
+  innerHTML: '',
+  querySelectorAll: () => [],
+};
+global.document = {
+  getElementById: (id) => fakeContainer,
+};
+
+ActionTrackingEngine.clear();
+ActionTrackingEngine.render('fake_container', {
+  candidatesOverride: [
+    {
+      id: 'act_label_test',
+      actionKey: 'label_test',
+      type: 'upcoming_payment',
+      priority: 'high',
+      title: 'Label Test Payment',
+      description: 'WHAT: Outgoing payment of ₹4,000.',
+      reason: 'WHY: Scheduled commitment requires cash.',
+      metric: 'METRIC: Amount = ₹4,000 | Due: Tomorrow',
+      amount: 4000,
+    }
+  ]
+});
+
+assert(!fakeContainer.innerHTML.includes('Why: WHY:'), 'Rendered HTML does NOT contain duplicated "Why: WHY:"');
+assert(!fakeContainer.innerHTML.includes('Metric: METRIC:'), 'Rendered HTML does NOT contain duplicated "Metric: METRIC:"');
+assert(fakeContainer.innerHTML.includes('WHY:</strong> Scheduled commitment requires cash.'), 'Rendered HTML contains clean "WHY:" exactly once');
+assert(fakeContainer.innerHTML.includes('METRIC:</strong> Amount = ₹4,000 | Due: Tomorrow'), 'Rendered HTML contains clean "METRIC:" exactly once');
+assert(fakeContainer.innerHTML.includes('overflow-wrap:break-word'), 'Card has overflow-wrap:break-word for robust layout wrapping');
+
+// -------------------------------------------------------------
 // SUMMARY
 // -------------------------------------------------------------
 console.log('\n======================================================');
