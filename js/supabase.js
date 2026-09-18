@@ -1609,8 +1609,15 @@ const SupabaseService = (() => {
    */
   function mapRowToActionTask(row) {
     if (!row) return null;
+    
+    // Phase 26 tenant isolation: restore original task ID by stripping business_id prefix
+    let originalId = row.id;
+    if (row.business_id && originalId.startsWith(row.business_id + '_')) {
+      originalId = originalId.substring(row.business_id.length + 1);
+    }
+
     return {
-      id: row.id,
+      id: originalId,
       businessId: row.business_id,
       actionKey: row.action_key,
       status: row.status || 'OPEN',
@@ -1630,8 +1637,11 @@ const SupabaseService = (() => {
   function mapActionTaskToRow(task, businessId) {
     const VALID_STATUSES = ['OPEN', 'IN_PROGRESS', 'COMPLETED', 'DISMISSED'];
     const status = VALID_STATUSES.includes(task.status) ? task.status : 'OPEN';
+    
+    // Phase 26 tenant isolation: prefix ID with business_id to prevent multi-tenant PK collisions
+    // since Phase 25 action IDs (e.g. 'act_cash_pressure') are deterministic globally.
     return {
-      id: task.id,
+      id: `${businessId}_${task.id}`,
       business_id: businessId,
       action_key: task.actionKey || task.id,
       status,
