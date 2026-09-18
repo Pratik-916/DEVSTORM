@@ -360,10 +360,11 @@ const AppState = (() => {
     if (!_store.currentUser) return;
 
     try {
-      const [supaTxns, supaAccs, supaObligations] = await Promise.all([
+      const [supaTxns, supaAccs, supaObligations, supaActionTasks] = await Promise.all([
         SupabaseService.fetchTransactions(),
         SupabaseService.fetchFinancialAccounts(),
         SupabaseService.fetchObligations(),
+        (typeof SupabaseService.fetchActionTasks === 'function') ? SupabaseService.fetchActionTasks() : Promise.resolve(null),
       ]);
 
       if (!_store.currentUser) return;
@@ -405,8 +406,15 @@ const AppState = (() => {
         _store.payments = supaObligations;
       }
 
+      // 4. Action Tasks (Phase 26): restore persisted execution state
+      if (Array.isArray(supaActionTasks) && supaActionTasks.length > 0) {
+        if (typeof ActionTrackingEngine !== 'undefined' && typeof ActionTrackingEngine.loadPersistedTasks === 'function') {
+          ActionTrackingEngine.loadPersistedTasks(supaActionTasks);
+        }
+      }
+
       refreshAllViews();
-      console.log(`[Cashly] Hydrated ${_store.transactions.length} txns, ${_store.financialAccounts.length} accounts, ${_store.payments.length} obligations from Supabase.`);
+      console.log(`[Cashly] Hydrated ${_store.transactions.length} txns, ${_store.financialAccounts.length} accounts, ${_store.payments.length} obligations, ${supaActionTasks ? supaActionTasks.length : 0} action tasks from Supabase.`);
     } catch (err) {
       console.warn('[Cashly] Notice synchronizing with Supabase:', err.message || err);
     }

@@ -1598,6 +1598,127 @@ const SupabaseService = (() => {
     }
   }
 
+  /* ============================================================
+     ACTION TASKS CRUD METHODS (Phase 26)
+     Persists merchant action execution lifecycle state.
+     Only stores execution metadata — NO financial data.
+     ============================================================ */
+
+  /**
+   * Map a Supabase action_tasks row to an in-memory task record.
+   */
+  function mapRowToActionTask(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      businessId: row.business_id,
+      actionKey: row.action_key,
+      status: row.status || 'OPEN',
+      notes: row.notes || null,
+      startedAt: row.started_at || null,
+      completedAt: row.completed_at || null,
+      dismissedAt: row.dismissed_at || null,
+      createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Map an in-memory task record to a Supabase action_tasks row.
+   * businessId must be resolved before calling this.
+   */
+  function mapActionTaskToRow(task, businessId) {
+    const VALID_STATUSES = ['OPEN', 'IN_PROGRESS', 'COMPLETED', 'DISMISSED'];
+    const status = VALID_STATUSES.includes(task.status) ? task.status : 'OPEN';
+    return {
+      id: task.id,
+      business_id: businessId,
+      action_key: task.actionKey || task.id,
+      status,
+      notes: task.notes || null,
+      started_at: task.startedAt || null,
+      completed_at: task.completedAt || null,
+      dismissed_at: task.dismissedAt || null,
+      updated_at: task.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Fetch all action task records for the current authenticated business.
+   * Returns array of mapped task objects, or null on failure.
+   */
+  async function fetchActionTasks() {
+    await ensureConnected();
+    if (!isConnected()) return null;
+
+    const biz = getCurrentBusiness();
+    if (!biz || !biz.id) return [];
+
+    try {
+      const { data, error } = await _client
+        .from('action_tasks')
+        .select('*')
+        .eq('business_id', biz.id);
+
+      if (error) {
+        if (error.code === 'PGRST205' || (error.message && error.message.includes('does not exist'))) {
+          console.warn('[Cashly] action_tasks table not found. Run supabase_schema.sql to enable Phase 26 persistence.');
+        } else {
+          console.warn('[Cashly] Notice fetching action tasks:', error.message || error);
+        }
+        return null;
+      }
+
+      return (data || []).map(mapRowToActionTask).filter(Boolean);
+    } catch (err) {
+      console.warn('[Cashly] Notice fetching action tasks:', err.message || err);
+      return null;
+    }
+  }
+
+  /**
+   * Upsert (insert or update) a single action task record.
+   * Uses id as the conflict target (unique text PK).
+   * Returns { success: true } or { success: false, error }.
+   * Does NOT silently swallow failures.
+   */
+  async function upsertActionTask(task) {
+    await ensureConnected();
+    if (!isConnected()) {
+      return { success: false, error: 'Supabase not connected' };
+    }
+
+    const biz = getCurrentBusiness();
+    if (!biz || !biz.id) {
+      return { success: false, error: 'No active business found' };
+    }
+
+    if (!task || !task.id) {
+      return { success: false, error: 'Invalid task: missing id' };
+    }
+
+    try {
+      const row = mapActionTaskToRow(task, biz.id);
+      const { error } = await _client
+        .from('action_tasks')
+        .upsert([row], { onConflict: 'id' });
+
+      if (error) {
+        if (error.code === 'PGRST205' || (error.message && error.message.includes('does not exist'))) {
+          console.warn('[Cashly] action_tasks table not found. Run supabase_schema.sql to enable Phase 26 persistence.');
+          return { success: false, error: 'action_tasks table not found' };
+        }
+        console.warn('[Cashly] Notice saving action task:', error.message || error);
+        return { success: false, error: error.message || 'Database write failed' };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.warn('[Cashly] Notice saving action task:', err.message || err);
+      return { success: false, error: err.message || 'Unexpected error saving action task' };
+    }
+  }
+
   return {
     init,
     ensureConnected,
@@ -1639,6 +1760,9 @@ const SupabaseService = (() => {
     createBudget,
     updateBudget,
     deleteBudget,
+    // Phase 26: Action Tasks Persistence
+    fetchActionTasks,
+    upsertActionTask,
   };
 })();
 

@@ -71,6 +71,20 @@ const ActionTrackingEngine = (() => {
   let _activeFilter = STATUS.OPEN;
 
   /* ----------------------------------------------------------
+     PHASE 26: SERIALIZED WRITE QUEUE
+     Prevents stale async writes from overwriting newer state.
+     Each mutation waits for the previous one before firing.
+     ---------------------------------------------------------- */
+  let _writeQueuePromise = Promise.resolve();
+
+  function _enqueueWrite(fn) {
+    _writeQueuePromise = _writeQueuePromise.then(() => fn()).catch(err => {
+      console.warn('[ActionTracking] Write queue error:', err.message || err);
+    });
+    return _writeQueuePromise;
+  }
+
+  /* ----------------------------------------------------------
      2. FORMATTING & ACCESSIBLE SVG ICONS (Zero Emojis)
      ---------------------------------------------------------- */
   function fmt(val) {
@@ -395,12 +409,16 @@ const ActionTrackingEngine = (() => {
       }
     }
 
-    // Update timestamps deterministically
+    // Deterministic timestamp handling:
+    // Each transition sets exactly the right timestamp and clears contradictory ones.
     const now = new Date().toISOString();
     const existing = _trackingStore.get(id) || {
       status: STATUS.OPEN,
       createdAt: now,
       notes: null,
+      startedAt: null,
+      completedAt: null,
+      dismissedAt: null,
     };
 
     const record = {
@@ -413,12 +431,21 @@ const ActionTrackingEngine = (() => {
       record.notes = metadata.notes ? String(metadata.notes).trim() : null;
     }
 
+    // Set timestamps for the new state; clear contradictory timestamps
     if (targetStatus === STATUS.IN_PROGRESS) {
-      record.startedAt = now;
+      record.startedAt = record.startedAt || now; // preserve earlier startedAt if restarting
+      record.completedAt = null;
+      record.dismissedAt = null;
     } else if (targetStatus === STATUS.COMPLETED) {
       record.completedAt = now;
+      record.dismissedAt = null;
     } else if (targetStatus === STATUS.DISMISSED) {
       record.dismissedAt = now;
+      record.completedAt = null;
+    } else if (targetStatus === STATUS.OPEN) {
+      // Reopening: clear terminal timestamps
+      record.completedAt = null;
+      record.dismissedAt = null;
     }
 
     _trackingStore.set(id, record);
@@ -435,13 +462,40 @@ const ActionTrackingEngine = (() => {
       _knownActions.set(id, updatedSnapshot);
     }
 
-    // Render if in browser DOM
+    // Render immediately — show current in-memory state
     if (typeof document !== 'undefined') {
       const container = document.getElementById('dashboard-action-center-container');
       if (container) {
         render('dashboard-action-center-container');
       }
     }
+
+    // Phase 26: Persist to Supabase via serialized write queue
+    // Capture the record at this point in time — not a closure over a mutable ref
+    const capturedId = id;
+    const capturedRecord = Object.assign({}, record);
+    const capturedRecord2 = Object.assign({ id: capturedId, actionKey: capturedId }, capturedRecord);
+
+    if (typeof document !== 'undefined') {
+      _showSaveStatus(capturedId, 'saving');
+    }
+
+    _enqueueWrite(async () => {
+      const result = await _persistTask(capturedId, capturedRecord2);
+      if (!result.success) {
+        // Persistence failed: surface error clearly on the card
+        // Do NOT rollback in-memory state (it would confuse the merchant)
+        // but clearly indicate the action was NOT saved
+        console.warn(`[ActionTracking] Failed to persist action "${capturedId}": ${result.error}`);
+        if (typeof document !== 'undefined') {
+          _showSaveStatus(capturedId, 'failed', result.error);
+        }
+      } else {
+        if (typeof document !== 'undefined') {
+          _showSaveStatus(capturedId, 'saved');
+        }
+      }
+    });
 
     return {
       success: true,
@@ -471,15 +525,27 @@ const ActionTrackingEngine = (() => {
 
   function addNote(id, noteText) {
     if (!id) return false;
-    const current = _trackingStore.get(id) || { status: STATUS.OPEN, createdAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const current = _trackingStore.get(id) || { status: STATUS.OPEN, createdAt: now, startedAt: null, completedAt: null, dismissedAt: null };
     current.notes = noteText ? String(noteText).trim() : null;
-    current.updatedAt = new Date().toISOString();
+    current.updatedAt = now;
     _trackingStore.set(id, current);
 
     if (typeof document !== 'undefined') {
       const container = document.getElementById('dashboard-action-center-container');
       if (container) render('dashboard-action-center-container');
     }
+
+    // Phase 26: Persist note update to Supabase
+    const capturedId = id;
+    const capturedRecord = Object.assign({ id: capturedId, actionKey: capturedId }, Object.assign({}, current));
+    _enqueueWrite(async () => {
+      const result = await _persistTask(capturedId, capturedRecord);
+      if (!result.success) {
+        console.warn(`[ActionTracking] Failed to persist note for action "${capturedId}": ${result.error}`);
+      }
+    });
+
     return true;
   }
 
@@ -489,6 +555,191 @@ const ActionTrackingEngine = (() => {
     _historyStore.clear();
     _knownActions.clear();
     _activeFilter = STATUS.OPEN;
+    _writeQueuePromise = Promise.resolve();
+  }
+
+  /* ----------------------------------------------------------
+     PHASE 26: PERSISTENCE HELPERS
+     ---------------------------------------------------------- */
+
+  /**
+   * _buildTaskRecord — build a minimal task object for persistence.
+   * Only persists execution-tracking fields; never touches financial data.
+   */
+  function _buildTaskRecord(id, record) {
+    return {
+      id,
+      actionKey: record.actionKey || id,
+      status: record.status,
+      notes: record.notes || null,
+      startedAt: record.startedAt || null,
+      completedAt: record.completedAt || null,
+      dismissedAt: record.dismissedAt || null,
+      createdAt: record.createdAt || new Date().toISOString(),
+      updatedAt: record.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  /**
+   * _persistTask — write one task to Supabase via the write queue.
+   * If persistence fails, renders a save-failure indicator on the action card.
+   * Does NOT fake success, does NOT fall back to LocalStorage.
+   *
+   * Offline / unavailable behavior:
+   *   If Supabase is unavailable or the user is offline, SupabaseService returns
+   *   { success: false, error: '...' } — we surface that visually and return false.
+   *   We do NOT silently swallow the failure.
+   */
+  async function _persistTask(id, record) {
+    if (typeof SupabaseService === 'undefined' || typeof SupabaseService.upsertActionTask !== 'function') {
+      // Supabase not loaded — app is in offline/unconnected mode.
+      return { success: false, error: 'SupabaseService not available' };
+    }
+    if (!SupabaseService.isConnected()) {
+      return { success: false, error: 'Not connected to Supabase' };
+    }
+
+    const taskRecord = _buildTaskRecord(id, record);
+    const result = await SupabaseService.upsertActionTask(taskRecord);
+    return result;
+  }
+
+  /**
+   * _showSaveStatus — inject a tiny persistence status indicator
+   * into the action card DOM element, if it exists.
+   * 'saving' → grey spinner label
+   * 'saved'  → green tick (auto-fades after 2.5s)
+   * 'failed' → red warning with error text
+   */
+  function _showSaveStatus(id, state, errorMsg) {
+    if (typeof document === 'undefined') return;
+    if (typeof document.querySelector !== 'function') return;
+
+    let card = null;
+    try { card = document.querySelector(`.action-card[data-action-id="${id}"]`); } catch (e) { return; }
+    if (!card) return;
+
+    // Remove any existing status indicators
+    try {
+      if (typeof card.querySelector === 'function') {
+        const existing = card.querySelector('.action-save-status');
+        if (existing && typeof existing.remove === 'function') existing.remove();
+      }
+    } catch (e) {}
+
+    if (state === 'saved') return; // silent success
+
+    if (typeof document.createElement !== 'function') return;
+    let indicator;
+    try { indicator = document.createElement('div'); } catch (e) { return; }
+    if (!indicator) return;
+
+    indicator.className = 'action-save-status';
+    try {
+      indicator.setAttribute('role', 'alert');
+      indicator.setAttribute('aria-live', 'polite');
+    } catch (e) {}
+
+    if (state === 'saving') {
+      try { indicator.style.cssText = 'font-size:10px;color:var(--c-text-muted);padding:2px 6px;text-align:right;'; } catch (e) {}
+      indicator.textContent = 'Saving\u2026';
+    } else if (state === 'failed') {
+      try { indicator.style.cssText = 'font-size:10px;color:var(--c-danger,#ef4444);padding:2px 6px;text-align:right;border-top:1px solid rgba(239,68,68,0.2);margin-top:4px;'; } catch (e) {}
+      indicator.textContent = 'Save failed' + (errorMsg ? ': ' + errorMsg : '') + '. Changes not persisted.';
+    }
+
+    try { if (typeof card.appendChild === 'function') card.appendChild(indicator); } catch (e) {}
+
+    // Auto-remove 'saving' indicator after 8s as a safety guard
+    if (state === 'saving') {
+      setTimeout(() => {
+        try { if (indicator.parentNode && typeof indicator.remove === 'function') indicator.remove(); } catch (e) {}
+      }, 8000);
+    }
+  }
+
+  /* ----------------------------------------------------------
+     PHASE 26: LOAD PERSISTED TASKS
+     Called by data.js/loadFromSupabase after Supabase hydration.
+     Merges persisted execution state into the in-memory tracking store
+     without overwriting newer in-session changes.
+     ---------------------------------------------------------- */
+
+  /**
+   * loadPersistedTasks — restore action execution state from Supabase records.
+   *
+   * Merge rules:
+   *  - For each record, only inject into _trackingStore if no in-session
+   *    state exists for that ID (i.e. the merchant has not already interacted).
+   *  - COMPLETED and IN_PROGRESS records are also loaded into _historyStore
+   *    so historical actions survive even when underlying signals disappear.
+   *  - Records with invalid/unknown statuses are skipped with a warning.
+   *  - Duplicate IDs from the database are silently deduplicated.
+   *
+   * @param {Array} tasks - Array of task objects from SupabaseService.fetchActionTasks()
+   */
+  function loadPersistedTasks(tasks) {
+    if (!Array.isArray(tasks) || tasks.length === 0) return;
+
+    const VALID_STATUSES = Object.values(STATUS);
+    let loaded = 0;
+
+    tasks.forEach(task => {
+      if (!task || typeof task.id !== 'string' || !task.id) {
+        console.warn('[ActionTracking] loadPersistedTasks: skipping record with missing id');
+        return;
+      }
+
+      const taskStatus = String(task.status || 'OPEN').toUpperCase();
+      if (!VALID_STATUSES.includes(taskStatus)) {
+        console.warn(`[ActionTracking] loadPersistedTasks: unknown status "${task.status}" for task ${task.id} — skipping`);
+        return;
+      }
+
+      // Only restore if no in-session interaction has already modified this record.
+      // This protects against a race where the merchant changes state after
+      // Supabase load started but before it returned.
+      if (_trackingStore.has(task.id)) {
+        const existing = _trackingStore.get(task.id);
+        const existingUpdated = new Date(existing.updatedAt || 0).getTime();
+        const persistedUpdated = new Date(task.updatedAt || 0).getTime();
+        // If in-session state is newer, keep it; do NOT overwrite
+        if (existingUpdated >= persistedUpdated) return;
+      }
+
+      const record = {
+        status: taskStatus,
+        notes: task.notes || null,
+        startedAt: task.startedAt || null,
+        completedAt: task.completedAt || null,
+        dismissedAt: task.dismissedAt || null,
+        createdAt: task.createdAt || new Date().toISOString(),
+        updatedAt: task.updatedAt || new Date().toISOString(),
+        actionKey: task.actionKey || task.id,
+      };
+
+      _trackingStore.set(task.id, record);
+
+      // Restore historical actions (COMPLETED / IN_PROGRESS) into history store
+      if (taskStatus === STATUS.COMPLETED || taskStatus === STATUS.IN_PROGRESS) {
+        _historyStore.set(task.id, {
+          id: task.id,
+          actionKey: record.actionKey,
+          isHistorical: true,
+          ...record,
+        });
+      }
+
+      loaded++;
+    });
+
+    console.log(`[ActionTracking] loadPersistedTasks: restored ${loaded}/${tasks.length} task(s) from Supabase.`);
+
+    // Re-render if dashboard is visible
+    if (typeof document !== 'undefined') {
+      const container = document.getElementById('dashboard-action-center-container');
+      if (container) render('dashboard-action-center-container');
+    }
   }
 
   function getActiveFilter() {
@@ -873,6 +1124,8 @@ const ActionTrackingEngine = (() => {
     syncRestore,
     clear,
     render,
+    // Phase 26: Persistence
+    loadPersistedTasks,
   };
 
 })();
