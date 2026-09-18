@@ -930,12 +930,18 @@ const ActionCenterEngine = (() => {
       return false;
     }
     _dismissedIds.add(id);
+    if (typeof ActionTrackingEngine !== 'undefined' && typeof ActionTrackingEngine.syncDismissal === 'function') {
+      ActionTrackingEngine.syncDismissal(id);
+    }
     render();
     return true;
   }
 
   function clearDismissed() {
     _dismissedIds.clear();
+    if (typeof ActionTrackingEngine !== 'undefined' && typeof ActionTrackingEngine.syncRestore === 'function') {
+      ActionTrackingEngine.syncRestore();
+    }
     render();
   }
 
@@ -944,6 +950,10 @@ const ActionCenterEngine = (() => {
      ---------------------------------------------------------- */
   function render(containerId = 'dashboard-action-center-container') {
     if (typeof document === 'undefined') return;
+
+    if (typeof ActionTrackingEngine !== 'undefined' && typeof ActionTrackingEngine.render === 'function') {
+      return ActionTrackingEngine.render(containerId);
+    }
 
     const container = document.getElementById(containerId);
     if (!container) return;

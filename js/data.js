@@ -476,6 +476,9 @@ const AppState = (() => {
     if (typeof DecisionWorkspaceEngine !== 'undefined' && typeof DecisionWorkspaceEngine.render === 'function') {
       DecisionWorkspaceEngine.render('insights-scenarios-container');
     }
+    if (typeof ActionTrackingEngine !== 'undefined' && typeof ActionTrackingEngine.render === 'function') {
+      ActionTrackingEngine.render('dashboard-action-center-container');
+    }
   }
 
   /* ---- Financial Accounts ---- */

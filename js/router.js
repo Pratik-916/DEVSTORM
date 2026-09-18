@@ -46,7 +46,9 @@ const Router = (() => {
       } else if (typeof Dashboard !== 'undefined') {
         Dashboard.renderSummary();
       }
-      if (typeof ActionCenterEngine !== 'undefined' && typeof ActionCenterEngine.render === 'function') {
+      if (typeof ActionTrackingEngine !== 'undefined' && typeof ActionTrackingEngine.render === 'function') {
+        ActionTrackingEngine.render('dashboard-action-center-container');
+      } else if (typeof ActionCenterEngine !== 'undefined' && typeof ActionCenterEngine.render === 'function') {
         ActionCenterEngine.render('dashboard-action-center-container');
       }
     }

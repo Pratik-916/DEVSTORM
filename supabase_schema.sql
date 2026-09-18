@@ -119,6 +119,21 @@ CREATE TABLE IF NOT EXISTS public.budgets (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 8. ACTION TASKS TABLE (Phase 25)
+-- Tracks merchant task execution, lifecycle statuses, and operational notes.
+CREATE TABLE IF NOT EXISTS public.action_tasks (
+    id TEXT PRIMARY KEY,
+    business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+    action_key TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'IN_PROGRESS', 'COMPLETED', 'DISMISSED')),
+    notes TEXT,
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    dismissed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================
 -- PERFORMANCE INDEXES
 -- ============================================================
@@ -137,6 +152,8 @@ CREATE INDEX IF NOT EXISTS idx_business_goals_business_id ON public.business_goa
 CREATE INDEX IF NOT EXISTS idx_business_goals_status ON public.business_goals (business_id, status);
 CREATE INDEX IF NOT EXISTS idx_budgets_business_id ON public.budgets (business_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_status ON public.budgets (business_id, status);
+CREATE INDEX IF NOT EXISTS idx_action_tasks_business_id ON public.action_tasks (business_id);
+CREATE INDEX IF NOT EXISTS idx_action_tasks_status ON public.action_tasks (business_id, status);
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS) PREPARATION & POLICIES
@@ -148,6 +165,7 @@ ALTER TABLE public.upcoming_obligations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.action_tasks ENABLE ROW LEVEL SECURITY;
 
 -- 1. Businesses Policies
 DROP POLICY IF EXISTS "Owners can manage own businesses" ON public.businesses;
@@ -248,4 +266,14 @@ FOR ALL
 TO authenticated
 USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))
 WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()));
+
+-- 8. Action Tasks Policies (Phase 25)
+DROP POLICY IF EXISTS "Owners can manage action tasks" ON public.action_tasks;
+CREATE POLICY "Owners can manage action tasks"
+ON public.action_tasks
+FOR ALL
+TO authenticated
+USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))
+WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()));
+
 

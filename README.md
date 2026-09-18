@@ -1145,7 +1145,72 @@ Every simulation provides clear consequence explanations:
 
 ---
 
-## 22. Local Development Setup
+## 22. Phase 25 — Cashflow Execution & Action Tracking
+
+### Overview
+Phase 25 completes the Cashly intelligence loop. While Phase 24 answered *"What happens if I do this?"*, Phase 25 answers:
+
+> **"What am I actually going to do about it, and is it done?"**
+
+It introduces `ActionTrackingEngine` (`js/action-tracking.js`), a lightweight execution-tracking layer built directly on top of the existing `ActionCenterEngine` signals.
+
+### Architectural Flow
+```
+Financial Data (Transactions, Payments, Settlements, Balances)
+      ↓
+Existing Intelligence Engines (Phases 9–24)
+      ↓
+ActionCenterEngine (Signal Discovery & Semantic Deduplication)
+      ↓
+ActionTrackingEngine (Execution Lifecycle, History Retention, Filters)
+      ↓
+Dashboard Action Center UI (#dashboard-action-center-container)
+```
+
+### Core Architecture & Behavioral Rules
+
+1. **Strict 4-State Lifecycle & State Machine**:
+   - `OPEN`: Discovered financial signal requiring merchant review.
+   - `IN_PROGRESS`: Merchant is actively executing or coordinating resolution.
+   - `COMPLETED`: Merchant marked action done (`completedAt` recorded).
+   - `DISMISSED`: Merchant hid non-critical action from view.
+   - **Allowed Transitions**:
+     - `OPEN` $\rightarrow$ `IN_PROGRESS`, `COMPLETED`, `DISMISSED`
+     - `IN_PROGRESS` $\rightarrow$ `OPEN` (pause), `COMPLETED`, `DISMISSED`
+     - `COMPLETED` $\rightarrow$ `OPEN` (reopen)
+     - `DISMISSED` $\rightarrow$ `OPEN` (restore)
+   - **Rejected Transitions**: Direct shifts from `COMPLETED` to `IN_PROGRESS`/`DISMISSED` or `DISMISSED` to `IN_PROGRESS`/`COMPLETED` are rejected by the state machine.
+
+2. **Absolute Financial Invariance**:
+   - Marking an action `IN_PROGRESS` or `COMPLETED` records merchant intent only.
+   - It **NEVER** mutates transactions, payments, settlements, balances, Available Cash, Safe to Spend, forecasts, budgets, or goals.
+   - Completing a task does NOT automatically assume the underlying money moved.
+
+3. **Critical Action Protection**:
+   - Signals flagged as `critical` (e.g. projected liquid deficits, uncovered immediate obligations) cannot be dismissed.
+   - Attempted dismissal throws an explicit error and is blocked in the UI.
+
+4. **Deterministic History Retention**:
+   - When an underlying financial signal later resolves naturally (e.g. overdue invoice settles, payment clears), previously `IN_PROGRESS` or `COMPLETED` actions are retained in the history store with `isHistorical: true` so merchant records are not immediately wiped out.
+
+5. **Integrated Dashboard UI**:
+   - Embedded directly in `#dashboard-action-center-container` without a separate tasks page or extra navigation item.
+   - Status filters: `Open` (default), `In Progress`, `Completed`, `Dismissed`, `All` with active counts.
+   - Execution summary chip displaying Open, In Progress, and Completed tallies.
+   - Pure accessible SVG icons (zero emojis, zero text symbols like `✓`, `×`, `↺`).
+   - Authoritative workflow bridges linking directly to Payments, Settlements, Collections, Budgets, Goals, Risk Overview, and Cash Planning.
+
+6. **Persistence Architecture**:
+   - Production schema prepared in `supabase_schema.sql` (Table 8: `action_tasks`) with tenant isolation and strict RLS.
+   - In the client, state is cleanly tracked in-memory against authoritative `ActionCenterEngine` candidate signals, strictly avoiding `localStorage` as a competing financial store of truth.
+
+### Application Versioning
+- Application release upgraded to **v2.0** (Phase 25 completed).
+- Service Worker offline cache updated to `cashly-cache-v15` with pre-caching of `js/action-tracking.js`.
+
+---
+
+## 23. Local Development Setup
 
 ### Prerequisites
 - Any standard static file server or Python 3 (`python -m http.server 8080`)
