@@ -693,7 +693,13 @@ const SupabaseService = (() => {
       description: row.description || '',
       date: row.transaction_date,
       time: formattedTime,
+      provider: row.provider || null,
+      provider_account_id: row.provider_account_id || null,
+      provider_transaction_id: row.provider_transaction_id || null,
+      provider_sync_hash: row.provider_sync_hash || null,
+      reconciliation_status: row.reconciliation_status || null,
       createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || null,
     };
   }
 
@@ -717,7 +723,13 @@ const SupabaseService = (() => {
       reference: txn.reference || '',
       description: txn.description || '',
       transaction_date: txn.date || new Date().toISOString().slice(0, 10),
+      provider: txn.provider || null,
+      provider_account_id: txn.provider_account_id || null,
+      provider_transaction_id: txn.provider_transaction_id || null,
+      provider_sync_hash: txn.provider_sync_hash || null,
+      reconciliation_status: txn.reconciliation_status || null,
       created_at: txn.createdAt || new Date().toISOString(),
+      updated_at: txn.updatedAt || null,
     };
   }
 
@@ -873,6 +885,11 @@ const SupabaseService = (() => {
       if (updates.reference !== undefined) rowUpdates.reference = updates.reference;
       if (updates.description !== undefined) rowUpdates.description = updates.description;
       if (updates.date !== undefined) rowUpdates.transaction_date = updates.date;
+      
+      // Phase 28 fields
+      if (updates.provider_sync_hash !== undefined) rowUpdates.provider_sync_hash = updates.provider_sync_hash;
+      if (updates.reconciliation_status !== undefined) rowUpdates.reconciliation_status = updates.reconciliation_status;
+      if (updates.updatedAt !== undefined) rowUpdates.updated_at = updates.updatedAt;
 
       let query = _client.from('transactions').update(rowUpdates).eq('id', id);
 

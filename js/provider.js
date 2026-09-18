@@ -803,41 +803,61 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       ? AppState.getTransactions()
       : [];
 
-    const existingIds = new Set();
-    const existingRefs = new Set();
-    const existingCompositeKeys = new Set();
+    // 2. Delegate to Reconciliation Engine
+    let syncResult = { imported: [], updated: [], skippedUnchanged: 0, invalid: [], requiresReview: [] };
+    
+    if (typeof ReconciliationEngine !== 'undefined') {
+      const accounts = this.getConnectedAccounts() || [];
+      const activeAccount = accounts.find(a => a.provider === ProviderType.MOCK);
+      
+      syncResult = ReconciliationEngine.reconcileBatch(normalizedBatch, existingTxns, activeAccount);
 
-    existingTxns.forEach(t => {
-      if (t.id) existingIds.add(t.id);
-      if (t.reference) existingRefs.add(t.reference);
-      // Preferred composite identity: provider + provider_account_id + provider_transaction_id
-      const p = t.provider || ProviderType.MOCK;
-      const pa = t.provider_account_id || t.providerAccountId || '';
-      const pt = t.provider_transaction_id || t.providerTransactionId || '';
-      if (pa && pt) {
-        existingCompositeKeys.add(`${p}:${pa}:${pt}`);
-      }
-    });
-
-    // 3. Filter out duplicate transactions
-    const newTransactions = normalizedBatch.filter(item => {
-      if (existingIds.has(item.id)) return false;
-      if (item.reference && existingRefs.has(item.reference)) return false;
-
-      const pKey = `${item.provider}:${item.provider_account_id}:${item.provider_transaction_id}`;
-      if (existingCompositeKeys.has(pKey)) return false;
-
-      return true;
-    });
-
-    // 4. Import new unique transactions only
-    if (newTransactions.length > 0) {
-      if (typeof AppState !== 'undefined' && typeof AppState.addTransactionsBatch === 'function') {
-        await AppState.addTransactionsBatch(newTransactions);
-      } else if (typeof AppState !== 'undefined' && typeof AppState.addTransaction === 'function') {
-        for (const txn of newTransactions) {
-          await AppState.addTransaction(txn);
+      // Persist NEW transactions
+      if (syncResult.imported.length > 0) {
+        if (typeof AppState !== 'undefined' && typeof AppState.addTransactionsBatch === 'function') {
+          await AppState.addTransactionsBatch(syncResult.imported);
         }
+      }
+      
+      // Persist UPDATED transactions
+      if (syncResult.updated.length > 0) {
+        if (typeof AppState !== 'undefined' && typeof AppState.updateTransaction === 'function') {
+          for (const txn of syncResult.updated) {
+            await AppState.updateTransaction(txn.id, txn);
+          }
+        }
+      }
+      
+      if (syncResult.requiresReview.length > 0 || syncResult.invalid.length > 0) {
+        console.warn(`[FinancialDataProvider] Sync warnings: ${syncResult.requiresReview.length} require review, ${syncResult.invalid.length} invalid.`);
+      }
+    } else {
+      // Fallback manual deduplication if reconciliation engine isn't loaded
+      const existingIds = new Set();
+      const existingRefs = new Set();
+      const existingCompositeKeys = new Set();
+
+      existingTxns.forEach(t => {
+        if (t.id) existingIds.add(t.id);
+        if (t.reference) existingRefs.add(t.reference);
+        const p = t.provider || ProviderType.MOCK;
+        const pa = t.provider_account_id || t.providerAccountId || '';
+        const pt = t.provider_transaction_id || t.providerTransactionId || '';
+        if (pa && pt) {
+          existingCompositeKeys.add(`${p}:${pa}:${pt}`);
+        }
+      });
+
+      syncResult.imported = normalizedBatch.filter(item => {
+        if (existingIds.has(item.id)) return false;
+        if (item.reference && existingRefs.has(item.reference)) return false;
+        const pKey = `${item.provider}:${item.provider_account_id}:${item.provider_transaction_id}`;
+        if (existingCompositeKeys.has(pKey)) return false;
+        return true;
+      });
+
+      if (syncResult.imported.length > 0 && typeof AppState !== 'undefined' && typeof AppState.addTransactionsBatch === 'function') {
+        await AppState.addTransactionsBatch(syncResult.imported);
       }
     }
 

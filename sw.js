@@ -18,6 +18,7 @@ const STATIC_ASSETS = [
   '/css/components.css',
   '/css/pages.css',
   '/js/supabase.js',
+  '/js/reconciliation.js',
   '/js/provider.js',
   '/js/data.js',
   '/js/patterns.js',

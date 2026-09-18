@@ -46,6 +46,12 @@ ADD COLUMN IF NOT EXISTS provider TEXT,
 ADD COLUMN IF NOT EXISTS provider_account_id TEXT,
 ADD COLUMN IF NOT EXISTS provider_transaction_id TEXT;
 
+-- Phase 28: Data Quality & Reconciliation Hardening
+ALTER TABLE public.transactions
+ADD COLUMN IF NOT EXISTS provider_sync_hash TEXT,
+ADD COLUMN IF NOT EXISTS reconciliation_status TEXT,
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
 -- 3. FINANCIAL ACCOUNTS TABLE
 -- Tracks connected banking, UPI, and digital merchant accounts for a business.
 CREATE TABLE IF NOT EXISTS public.financial_accounts (
