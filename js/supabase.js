@@ -913,28 +913,66 @@ const SupabaseService = (() => {
     return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
   }
 
+  /**
+   * mapRowToAccount
+   * Converts a Supabase financial_accounts DB row to an AppState account object.
+   *
+   * CANONICAL ACCOUNT ID MODEL (Phase 27):
+   *   provider_account_id — Phase 27 canonical provider-owned account identifier.
+   *   external_account_id — Phase 9 legacy field; preserved for backward compatibility.
+   *   Both are read from the row and exposed on the returned object.
+   */
   function mapRowToAccount(row) {
     return {
       id: row.id,
       businessId: row.business_id,
       name: row.name,
-      type: row.type || 'Bank', // Bank, UPI, Card, Cash, Credit
+      // 'type' is the legacy generic column; 'account_type' is the Phase 27 structured field.
+      // Both are exposed for compatibility. Prefer account_type where available.
+      type: row.type || row.account_type || 'Bank',
+      account_type: row.account_type || row.type || 'Bank',
       provider: row.provider || row.name,
       status: row.status || 'connected',
+      // Phase 27 fields
+      institution_name: row.institution_name || null,
+      currency: row.currency || 'INR',
+      metadata: row.metadata || null,
+      connection_status: row.connection_status || 'DISCONNECTED',
+      last_synced_at: row.last_synced_at || null,
+      // Canonical Phase 27 provider-owned account identifier
+      provider_account_id: row.provider_account_id || row.external_account_id || null,
+      // Legacy Phase 9 field — preserved as-is for backward compatibility
+      external_account_id: row.external_account_id || row.provider_account_id || null,
       createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || null,
     };
   }
 
+  /**
+   * mapAccountToRow
+   * Converts an AppState account object to a Supabase financial_accounts DB row.
+   * All Phase 27 fields are explicitly mapped to prevent silent loss on upsert.
+   */
   function mapAccountToRow(acc) {
     const businessId = acc.businessId || (_currentBusiness ? _currentBusiness.id : null);
     return {
       id: isUUID(acc.id) ? acc.id : generateUUID(),
       business_id: businessId,
       name: acc.name,
-      type: acc.type || 'Bank',
+      type: acc.account_type || acc.type || 'Bank',
+      account_type: acc.account_type || acc.type || 'Bank',
       provider: acc.provider || acc.name,
       status: acc.status || 'connected',
+      // Phase 27 fields
+      institution_name: acc.institution_name || null,
+      currency: acc.currency || 'INR',
+      metadata: acc.metadata || null,
+      connection_status: acc.connection_status || 'DISCONNECTED',
+      last_synced_at: acc.last_synced_at || null,
+      provider_account_id: acc.provider_account_id || acc.external_account_id || null,
+      external_account_id: acc.external_account_id || acc.provider_account_id || null,
       created_at: acc.createdAt || new Date().toISOString(),
+      updated_at: acc.updatedAt || new Date().toISOString(),
     };
   }
 
@@ -987,10 +1025,22 @@ const SupabaseService = (() => {
 
     try {
       const dbUpdates = {};
+      // Core fields
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.type !== undefined) dbUpdates.type = updates.type;
       if (updates.provider !== undefined) dbUpdates.provider = updates.provider;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
+      // Phase 27 fields
+      if (updates.account_type !== undefined) dbUpdates.account_type = updates.account_type;
+      if (updates.institution_name !== undefined) dbUpdates.institution_name = updates.institution_name;
+      if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
+      if (updates.metadata !== undefined) dbUpdates.metadata = updates.metadata;
+      if (updates.connection_status !== undefined) dbUpdates.connection_status = updates.connection_status;
+      if (updates.last_synced_at !== undefined) dbUpdates.last_synced_at = updates.last_synced_at;
+      if (updates.provider_account_id !== undefined) dbUpdates.provider_account_id = updates.provider_account_id;
+      if (updates.external_account_id !== undefined) dbUpdates.external_account_id = updates.external_account_id;
+      // Always update the audit timestamp
+      dbUpdates.updated_at = new Date().toISOString();
 
       let query = _client.from('financial_accounts').update(dbUpdates).eq('id', id);
       if (_currentBusiness && _currentBusiness.id) {

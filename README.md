@@ -1264,8 +1264,184 @@ Cashly is built as a pure, zero-build client application that deploys directly t
 4. **Hypothetical Scenario Boundary**: Scenario simulations are local in-memory tools for vendor decision-support and do not automatically sync with external accounting software.
 5. **Reserve & Savings Ledger**: Cashly tracks liquid reserves through Safe to Spend without a dedicated savings account ledger.
 
+
 ---
 
-## 25. License
+## 25. Phase 27 — Real Financial Account Integration Foundation
+
+> Cashly **does NOT currently connect to real financial institutions.**
+> All account data shown in the app is simulated by `MockFinancialDataProvider`.
+> Phase 27 builds the architecture that a real provider will plug into.
+
+---
+
+### Provider Architecture
+
+Cashly uses a decoupled **Financial Data Provider** layer that cleanly separates the application's financial intelligence from external account connectivity.
+
+```
+FinancialDataProvider (abstract base)
+├── MockFinancialDataProvider   ← active in production (demo/simulated)
+├── AccountAggregatorProvider   ← stub for RBI AA ecosystem (Edge Function required)
+└── [Future] BankDirectProvider ← bank API adapter (backend only)
+```
+
+**`ProviderRegistry`** is a service locator that manages provider registration and active-provider selection. The active provider is currently always `MockFinancialDataProvider`.
+
+---
+
+### FinancialDataProvider Interface
+
+Every provider implements this contract:
+
+| Method | Description |
+|---|---|
+| `connectAccount(config)` | Initiate account connection or consent handshake |
+| `disconnectAccount(id)` | Revoke access and clear state |
+| `listAccounts()` | List available accounts after connection |
+| `syncTransactions(options)` | Fetch and import normalized transactions |
+| `getSyncStatus()` | Current connection and sync state |
+| `getConnectedAccounts()` | List all active account connections |
+| `getCapabilities()` | Declare which operations this provider supports |
+| `normalizeTransaction(raw)` | Convert raw provider payload to Cashly schema |
+
+---
+
+### ProviderErrorCategory
+
+```js
+ProviderErrorCategory.AUTH_FAILED           // authentication or token failure
+ProviderErrorCategory.PROVIDER_UNAVAILABLE  // provider service is down
+ProviderErrorCategory.CONNECTION_FAILED     // could not establish connection
+ProviderErrorCategory.SYNC_FAILED           // data sync failed
+ProviderErrorCategory.MALFORMED_DATA        // provider returned unexpected payload
+ProviderErrorCategory.DUPLICATE_TRANSACTION // duplicate import rejected
+ProviderErrorCategory.OWNERSHIP_VIOLATION   // cross-business access rejected
+```
+
+### ProviderError
+
+`ProviderError` is a typed error class for all provider operations.
+
+**Security contract:**
+- `toUserMessage()` **always** returns a safe, credential-free message.
+- `_cause` (internal debugging detail) is **never** exposed to the user.
+- Provider tokens, API keys, OTPs, and passwords must **never** appear in `message`, `code`, or any user-facing field.
+
+```js
+throw new ProviderError({
+  code: 'SYNC_TIMEOUT',
+  category: ProviderErrorCategory.SYNC_FAILED,
+  message: 'Account sync failed. Your existing data is unchanged.',
+  provider: ProviderType.MOCK,
+  operation: 'syncTransactions',
+  retryable: true,
+  isSafe: true,
+  cause: internalError,   // internal only — never shown to user
+});
+```
+
+---
+
+### Account Lifecycle
+
+```
+DISCONNECTED
+    │
+    ▼ connectAccount()
+CONNECTING
+    │
+    ▼ consent granted
+CONSENT_REQUIRED ──▶ CONNECT_FAILED (on failure)
+    │
+    ▼
+SYNCING
+    │
+    ▼ sync complete
+CONNECTED ◀──────── SYNC_FAILED (on sync error, stays connected)
+    │
+    ▼ disconnectAccount()
+DISCONNECTED
+```
+
+---
+
+### Canonical Account ID Model
+
+| Field | Role |
+|---|---|
+| `provider_account_id` | **Phase 27 canonical** — the stable, provider-assigned account identifier |
+| `external_account_id` | **Phase 9 legacy** — preserved for backward compatibility; existing rows are unaffected |
+
+Both fields are read and exposed by `mapRowToAccount`. When only `external_account_id` exists (legacy rows), it is used as the canonical identifier automatically.
+
+---
+
+### Transaction Normalization & Idempotency
+
+Every provider transaction is normalized into a stable Cashly transaction object. Deduplication uses a **composite key**:
+
+```
+provider + provider_account_id + provider_transaction_id
+```
+
+The same provider transaction received multiple times will **never** create duplicate ledger entries. Amount, date, and description alone are **not** used as the identity key.
+
+---
+
+### Sync Contract
+
+A sync operation must:
+
+1. Identify the connected account
+2. Request provider data
+3. Normalize provider transactions → Cashly schema
+4. Deduplicate against the existing transaction store
+5. Persist only new/updated transactions via `AppState.addTransactionsBatch()`
+6. Update `last_synced_at` on the financial account record
+7. Return an explicit `{ imported, count, duplicatesSkipped }` result
+
+Sync failures must use `ProviderError` — they must **not** be silently swallowed.
+
+---
+
+### Security Boundary
+
+| What | Where |
+|---|---|
+| Supabase `anon` key (publishable) | Frontend — safe to expose |
+| Supabase `service_role` key | **Never in frontend code** |
+| Provider API keys, tokens, OTPs | **Never in frontend code** |
+| Consent requests, FIU signing | Supabase Edge Function (future) |
+| FIP data decryption | Supabase Edge Function (future) |
+| Provider credentials | **Never stored in LocalStorage or IndexedDB** |
+| Provider responses | **Never cached by Service Worker** |
+
+A real provider integration **must** use a Supabase Edge Function (or equivalent backend) as the security boundary. The browser frontend only calls Supabase — never a provider API directly.
+
+---
+
+### Provider Capabilities
+
+`getCapabilities()` returns a flag object describing what a provider supports:
+
+| Provider | connect | disconnect | listAccounts | syncTransactions | getConnectionStatus |
+|---|---|---|---|---|---|
+| `MockFinancialDataProvider` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `AccountAggregatorProvider` | ❌ (Edge Fn) | ❌ (Edge Fn) | ❌ (Edge Fn) | ❌ (Edge Fn) | ✅ |
+
+---
+
+### What Phase 27 Intentionally Does NOT Implement
+
+- Real bank, UPI, card network, or Account Aggregator connection
+- Supabase Edge Functions for consent/token management
+- FIU registration or AA ecosystem onboarding
+- Real transaction data from any financial institution
+- New UI pages or dashboard redesign
+
+---
+
+## 26. License
 
 Released under the MIT License. Developed for DEVSTORM 2026.

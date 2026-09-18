@@ -497,20 +497,37 @@ const AppState = (() => {
 
   async function addFinancialAccount(accountData) {
     const biz = typeof SupabaseService !== 'undefined' ? SupabaseService.getCurrentBusiness() : null;
-    const allowedTypes = ['Bank', 'UPI', 'Card', 'Cash', 'Credit'];
-    const accType = allowedTypes.includes(accountData.type) ? accountData.type : 'Bank';
+    const allowedTypes = ['Bank', 'UPI', 'Card', 'Cash', 'Credit', 'Wallet'];
+    const accType = allowedTypes.includes(accountData.account_type || accountData.type)
+      ? (accountData.account_type || accountData.type)
+      : 'Bank';
 
     const isUUID = str => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     const newId = isUUID(accountData.id) ? accountData.id : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }));
+
+    // Canonical account ID model (Phase 27):
+    //   provider_account_id = canonical provider-assigned identifier
+    //   external_account_id = Phase 9 legacy field, kept for backward compatibility
+    const providerAccountId = accountData.provider_account_id || accountData.external_account_id || null;
 
     const newAcc = {
       id: newId,
       businessId: biz ? biz.id : null,
       name: accountData.name || 'Account',
       type: accType,
+      account_type: accType,
       provider: accountData.provider || accountData.name || accType,
+      // Phase 27 fields
+      institution_name: accountData.institution_name || null,
+      currency: accountData.currency || 'INR',
+      metadata: accountData.metadata || null,
       status: accountData.status || 'connected',
+      connection_status: accountData.connection_status || (accountData.status === 'connected' ? 'CONNECTED' : 'DISCONNECTED'),
+      last_synced_at: accountData.last_synced_at || null,
+      provider_account_id: providerAccountId,
+      external_account_id: accountData.external_account_id || providerAccountId || null,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     _store.financialAccounts.push(newAcc);

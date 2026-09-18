@@ -276,4 +276,64 @@ TO authenticated
 USING (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()))
 WITH CHECK (business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid()));
 
+-- ============================================================
+-- PHASE 27: REAL FINANCIAL ACCOUNT INTEGRATION FOUNDATION
+-- Schema migration — extends financial_accounts with fields
+-- required for the production provider architecture.
+--
+-- CANONICAL ACCOUNT ID MODEL:
+--   provider_account_id = Phase 27 canonical provider-owned identifier
+--     (e.g. the unique ID the bank/UPI/AA assigns to this account)
+--   external_account_id = Phase 9 legacy field — preserved for backward
+--     compatibility. Existing rows keep their external_account_id values.
+--
+-- Safe to run more than once (ADD COLUMN IF NOT EXISTS).
+-- ============================================================
+
+-- 9. FINANCIAL ACCOUNTS — Phase 27 extended fields
+
+-- Human-readable name of the institution (e.g. "HDFC Bank", "Axis Bank")
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS institution_name TEXT;
+
+-- Structured account classification separate from the generic 'type' column.
+-- Values: Bank, UPI, Card, Cash, Credit, Wallet
+-- The existing 'type' column is kept as-is for backward compatibility.
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS account_type TEXT;
+
+-- ISO 4217 currency code. Defaults to INR for all existing Cashly businesses.
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'INR';
+
+-- Opaque provider-specific extras (e.g. routing number, IFSC).
+-- MUST NOT contain credentials, tokens, or secrets.
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS metadata JSONB;
+
+-- Phase 27 canonical provider account identifier.
+-- This is the stable, provider-assigned ID for this account.
+-- external_account_id (Phase 9) is preserved for backward compatibility.
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS provider_account_id TEXT;
+
+-- Audit column: tracks when the account record was last modified.
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- NOTE: We do NOT add a CHECK constraint to connection_status here because
+-- existing rows may contain legacy values ('ERROR', 'CONSENT_REQUIRED', etc.)
+-- from Phase 9. The valid lifecycle values are documented in provider.js:
+--   DISCONNECTED, CONNECTING, CONSENT_REQUIRED, CONNECTED,
+--   SYNCING, ERROR, CONNECT_FAILED, SYNC_FAILED
+
+-- Phase 27 Performance Indexes
+
+-- Provider/account lookup for idempotency and duplicate prevention
+CREATE INDEX IF NOT EXISTS idx_financial_accounts_provider_account_id
+ON public.financial_accounts (business_id, provider_account_id);
+
+-- Quick lookup of connected accounts for a business
+CREATE INDEX IF NOT EXISTS idx_financial_accounts_connection_status
+ON public.financial_accounts (business_id, connection_status);
 

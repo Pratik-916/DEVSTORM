@@ -1,4 +1,4 @@
-﻿/**
+/**
  * test_phase26_persistence.js
  * ============================================================
  * Cashly Phase 26 Audit Suite: Persistent Cashflow Action History
@@ -290,7 +290,8 @@ assert(supabaseSrc.includes("upsert([row], { onConflict: 'id' })"), 'upsertActio
 assert(supabaseSrc.includes('return { success: true }'), 'upsertActionTask returns success:true on success');
 assert(supabaseSrc.includes('return { success: false, error:'), 'upsertActionTask returns success:false on failure');
 const swSrc = fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8');
-assert(swSrc.includes('cashly-cache-v16'), 'sw.js bumped to v16 for Phase 26');
+// Phase 27 bumped SW cache to v17 — v16 or v17 are both valid here
+assert(swSrc.includes('cashly-cache-v16') || swSrc.includes('cashly-cache-v17'), 'sw.js has v16+ cache (v17 valid after Phase 27 bump)');
 assert(!swSrc.includes('cashly-cache-v15'), 'sw.js no longer uses v15');
 console.log('  [INFO] Full real Supabase verification requires authenticated browser session.');
 console.log('  [INFO] See walkthrough.md for manual verification procedure.');

@@ -36,6 +36,15 @@ const ProviderType = Object.freeze({
 
 /**
  * Connection Lifecycle States
+ *
+ * DISCONNECTED  — No account is connected.
+ * CONNECTING    — Handshake / consent request in progress.
+ * CONSENT_REQUIRED — Awaiting user consent (e.g. AA redirect).
+ * CONNECTED     — Account connected and ready.
+ * SYNCING       — Active data fetch in progress.
+ * ERROR         — Generic failure (legacy — retained for backward compat).
+ * CONNECT_FAILED — Connection attempt failed (Phase 27 explicit state).
+ * SYNC_FAILED   — Sync attempt failed without disconnecting (Phase 27 explicit state).
  */
 const ConnectionState = Object.freeze({
   DISCONNECTED: 'DISCONNECTED',
@@ -43,8 +52,89 @@ const ConnectionState = Object.freeze({
   CONSENT_REQUIRED: 'CONSENT_REQUIRED',
   CONNECTED: 'CONNECTED',
   SYNCING: 'SYNCING',
-  ERROR: 'ERROR',
+  ERROR: 'ERROR',              // legacy — kept for backward compatibility
+  CONNECT_FAILED: 'CONNECT_FAILED',   // Phase 27
+  SYNC_FAILED: 'SYNC_FAILED',         // Phase 27
 });
+
+/**
+ * ProviderErrorCategory
+ * Classifies the type of failure that occurred in a provider operation.
+ * Used by ProviderError to produce safe, structured error information.
+ *
+ * Phase 27 — Real Financial Account Integration Foundation.
+ */
+const ProviderErrorCategory = Object.freeze({
+  AUTH_FAILED: 'AUTH_FAILED',                   // Authentication or token failure
+  PROVIDER_UNAVAILABLE: 'PROVIDER_UNAVAILABLE', // Provider service is down
+  CONNECTION_FAILED: 'CONNECTION_FAILED',       // Could not establish account connection
+  SYNC_FAILED: 'SYNC_FAILED',                   // Data sync failed
+  MALFORMED_DATA: 'MALFORMED_DATA',             // Provider returned unexpected payload
+  DUPLICATE_TRANSACTION: 'DUPLICATE_TRANSACTION', // Duplicate import rejected
+  OWNERSHIP_VIOLATION: 'OWNERSHIP_VIOLATION',   // Cross-business access attempt rejected
+});
+
+/**
+ * ProviderError
+ * Typed error for all financial provider operations.
+ *
+ * SECURITY CONTRACT:
+ *   - `toUserMessage()` ALWAYS returns a safe, credential-free message.
+ *   - `_cause` (internal debugging detail) is NEVER exposed to the user.
+ *   - Provider tokens, API keys, OTPs, passwords MUST NOT appear in
+ *     `message`, `code`, or any user-facing field.
+ *
+ * Phase 27 — Real Financial Account Integration Foundation.
+ */
+class ProviderError extends Error {
+  /**
+   * @param {Object} options
+   * @param {string} options.code           Machine-readable error code
+   * @param {string} options.category       Value from ProviderErrorCategory
+   * @param {string} options.message        Safe human-readable summary
+   * @param {string} [options.provider]     Provider type (ProviderType value)
+   * @param {string} [options.operation]    Operation that failed (e.g. 'syncTransactions')
+   * @param {boolean} [options.retryable]   Whether the caller should retry
+   * @param {boolean} [options.isSafe]      Whether message is safe to show user
+   * @param {any}    [options.cause]        Internal debugging detail — NEVER expose to user
+   */
+  constructor({ code, category, message, provider, operation, retryable = false, isSafe = true, cause = null } = {}) {
+    super(message);
+    this.name = 'ProviderError';
+    this.code = code;
+    this.category = category;
+    this.provider = provider || null;
+    this.operation = operation || null;
+    this.retryable = !!retryable;
+    this.isSafe = !!isSafe;
+    this._cause = cause; // internal only — never serialise or display
+  }
+
+  /**
+   * Returns a safe, user-facing error message.
+   * NEVER exposes tokens, secrets, or raw provider payloads.
+   * @returns {string}
+   */
+  toUserMessage() {
+    const safeMessages = {
+      [ProviderErrorCategory.AUTH_FAILED]:
+        'Authentication failed. Please reconnect your account.',
+      [ProviderErrorCategory.PROVIDER_UNAVAILABLE]:
+        'The financial provider is temporarily unavailable. Please try again later.',
+      [ProviderErrorCategory.CONNECTION_FAILED]:
+        'Could not connect to the financial provider. Please check your connection and try again.',
+      [ProviderErrorCategory.SYNC_FAILED]:
+        'Account sync failed. Your existing data is unchanged.',
+      [ProviderErrorCategory.MALFORMED_DATA]:
+        'Received unexpected data from the provider. Sync skipped to protect your records.',
+      [ProviderErrorCategory.DUPLICATE_TRANSACTION]:
+        'Duplicate transaction detected and skipped.',
+      [ProviderErrorCategory.OWNERSHIP_VIOLATION]:
+        'Access denied. This account does not belong to your business.',
+    };
+    return (this.isSafe && this.message) ? this.message : (safeMessages[this.category] || 'A provider error occurred. Please try again.');
+  }
+}
 
 /**
  * Base FinancialDataProvider Specification
@@ -127,6 +217,30 @@ class FinancialDataProvider {
   }
 
   /**
+   * Returns the provider's supported capabilities.
+   * Real providers should override this to accurately reflect their feature set.
+   * @returns {Object} capability flags
+   */
+  getCapabilities() {
+    return {
+      connect: false,
+      disconnect: false,
+      listAccounts: false,
+      syncTransactions: false,
+      getConnectionStatus: false,
+    };
+  }
+
+  /**
+   * Lists financial accounts available from this provider after connection.
+   * Conceptual flow: connect() → listAccounts() → user selects → syncTransactions()
+   * @returns {Promise<Array<Object>>} list of available provider accounts
+   */
+  async listAccounts() {
+    throw new Error(`listAccounts() must be implemented by ${this.name}`);
+  }
+
+  /**
    * Subscribes to status and sync updates.
    * @param {Function} fn
    * @returns {Function} unsubscribe callback
@@ -151,6 +265,38 @@ class AccountAggregatorProvider extends FinancialDataProvider {
     this.aaEndpoint = config.aaEndpoint || null;
     this._connectionState = ConnectionState.DISCONNECTED;
     this._isSyncing = false;
+  }
+
+  /**
+   * AA provider capabilities.
+   * All network operations require a secure server-side Edge Function.
+   * Only getConnectionStatus is available client-side.
+   */
+  getCapabilities() {
+    return {
+      connect: false,          // requires Supabase Edge Function + FIU private key
+      disconnect: false,       // requires Supabase Edge Function
+      listAccounts: false,     // requires active consent via Edge Function
+      syncTransactions: false, // requires signed data fetch via Edge Function
+      getConnectionStatus: true,
+    };
+  }
+
+  /**
+   * listAccounts() for AA is explicitly prohibited client-side.
+   * Account listing requires consent verification via backend Edge Function.
+   */
+  async listAccounts() {
+    throw new ProviderError({
+      code: 'AA_LIST_ACCOUNTS_BOUNDARY',
+      category: ProviderErrorCategory.CONNECTION_FAILED,
+      message: 'Account listing for RBI Account Aggregator requires server-side execution.',
+      provider: ProviderType.AA,
+      operation: 'listAccounts',
+      retryable: false,
+      isSafe: true,
+      cause: '[Cashly Security Boundary] AA account listing must occur via Supabase Edge Function with signed FIU certificates.',
+    });
   }
 
   /**
@@ -457,8 +603,50 @@ class MockFinancialDataProvider extends FinancialDataProvider {
   }
 
   /**
+   * Returns capabilities supported by the mock sandbox provider.
+   */
+  getCapabilities() {
+    return {
+      connect: true,
+      disconnect: true,
+      listAccounts: true,
+      syncTransactions: true,
+      getConnectionStatus: true,
+    };
+  }
+
+  /**
+   * Lists accounts available under this mock provider.
+   * Returns the simulated demo channels as provider accounts.
+   *
+   * In the real provider flow: connect() → listAccounts() → user selects → syncTransactions().
+   * The mock simulates this by returning channels as selectable accounts.
+   *
+   * @returns {Promise<Array<Object>>} list of simulated provider accounts
+   */
+  async listAccounts() {
+    return this._channels.map(ch => ({
+      id: `mock-account-${ch.id}`,
+      provider_account_id: `mock-${ch.id}`,
+      account_name: ch.name,
+      account_type: ch.type,
+      institution_name: ch.provider,
+      currency: 'INR',
+      status: ch.status,
+      isSimulated: true,
+    }));
+  }
+
+  /**
    * Connect an account with strict lifecycle transitions and Supabase persistence.
-   * Lifecycle: DISCONNECTED -> CONNECTING -> CONSENT_REQUIRED -> SYNCING -> CONNECTED
+   *
+   * Lifecycle: DISCONNECTED → CONNECTING → CONSENT_REQUIRED → SYNCING → CONNECTED
+   * Failure:   DISCONNECTED → CONNECTING → CONNECT_FAILED
+   *
+   * NOTE: The demo provider_account_id is derived from the provided accountConfig
+   * rather than hardcoded. The legacy external_account_id value ('hdfc-merchant-8821')
+   * is preserved for backward compatibility with existing transactions that were
+   * imported using that composite key.
    */
   async connectAccount(accountConfig = {}) {
     try {
@@ -481,27 +669,40 @@ class MockFinancialDataProvider extends FinancialDataProvider {
       this._connectionState = ConnectionState.CONNECTED;
       this._isSyncing = false;
 
+      // Derive provider_account_id from the accountConfig rather than hardcoding.
+      // For the demo, 'hdfc-merchant-8821' is kept as external_account_id for backward
+      // compatibility (existing imported transactions use it as composite dedup key).
+      const providerAccountId = accountConfig.provider_account_id || accountConfig.external_account_id || 'hdfc-merchant-8821';
+
       // 1. Persist connection state to Supabase financial_accounts with provider metadata
       const demoAccount = {
         name: accountConfig.name || 'HDFC Bank - 8821',
         type: accountConfig.type || 'Bank',
+        account_type: accountConfig.account_type || accountConfig.type || 'Bank',
+        institution_name: accountConfig.institution_name || accountConfig.provider || 'Demo Bank (Simulated)',
+        currency: accountConfig.currency || 'INR',
         provider: ProviderType.MOCK,
+        provider_account_id: providerAccountId,
+        external_account_id: providerAccountId,  // kept for backward compat
         status: 'connected',
-        external_account_id: 'hdfc-merchant-8821',
         connection_status: ConnectionState.CONNECTED,
         last_synced_at: new Date().toISOString(),
       };
 
       if (typeof AppState !== 'undefined' && typeof AppState.addFinancialAccount === 'function') {
         const existingAccounts = AppState.getFinancialAccounts() || [];
-        const existing = existingAccounts.find(a => 
-          a.name.includes('HDFC') || (a.provider && a.provider.includes('HDFC')) || (a.external_account_id === 'hdfc-merchant-8821')
+        // Idempotent lookup: match by provider_account_id, external_account_id, or name
+        const existing = existingAccounts.find(a =>
+          (a.provider_account_id && a.provider_account_id === providerAccountId) ||
+          (a.external_account_id && a.external_account_id === providerAccountId) ||
+          (a.name && a.name === demoAccount.name)
         );
         if (existing) {
           await AppState.updateFinancialAccount(existing.id, {
             status: 'connected',
             connection_status: ConnectionState.CONNECTED,
             last_synced_at: new Date().toISOString(),
+            provider_account_id: providerAccountId,
           });
         } else {
           await AppState.addFinancialAccount(demoAccount);
@@ -518,16 +719,26 @@ class MockFinancialDataProvider extends FinancialDataProvider {
         account: demoAccount,
       };
     } catch (err) {
-      this._connectionState = ConnectionState.ERROR;
+      // Use explicit CONNECT_FAILED state instead of generic ERROR
+      this._connectionState = ConnectionState.CONNECT_FAILED;
       this._isSyncing = false;
       this._notify();
-      throw err;
+      throw new ProviderError({
+        code: 'MOCK_CONNECT_FAILED',
+        category: ProviderErrorCategory.CONNECTION_FAILED,
+        message: 'Demo account connection failed. Please try again.',
+        provider: ProviderType.MOCK,
+        operation: 'connectAccount',
+        retryable: true,
+        isSafe: true,
+        cause: err,
+      });
     }
   }
 
   /**
    * Disconnect an account and persist state to Supabase.
-   * Lifecycle: CONNECTED -> DISCONNECTED
+   * Lifecycle: CONNECTED → DISCONNECTED
    */
   async disconnectAccount(accountId = null) {
     this._isAccountConnected = false;
@@ -633,6 +844,19 @@ class MockFinancialDataProvider extends FinancialDataProvider {
     this._lastSynced = new Date();
     this._isSyncing = false;
     this._connectionState = this._isAccountConnected ? ConnectionState.CONNECTED : previousState;
+
+    // Update last_synced_at on the connected account record
+    if (this._isAccountConnected && typeof AppState !== 'undefined' && typeof AppState.getFinancialAccounts === 'function') {
+      const accounts = AppState.getFinancialAccounts() || [];
+      const connected = accounts.find(a => a.status === 'connected' && a.provider === ProviderType.MOCK);
+      if (connected && typeof AppState.updateFinancialAccount === 'function') {
+        AppState.updateFinancialAccount(connected.id, {
+          last_synced_at: this._lastSynced.toISOString(),
+          connection_status: ConnectionState.CONNECTED,
+        }).catch(() => {}); // non-fatal
+      }
+    }
+
     this._notify();
 
     console.log(`[FinancialDataProvider] Sync complete: ${newTransactions.length} new transactions imported (${normalizedBatch.length - newTransactions.length} duplicates skipped).`);
@@ -745,6 +969,8 @@ const DigitalFeedProvider = {
 if (typeof window !== 'undefined') {
   window.ProviderType = ProviderType;
   window.ConnectionState = ConnectionState;
+  window.ProviderErrorCategory = ProviderErrorCategory;    // Phase 27
+  window.ProviderError = ProviderError;                    // Phase 27
   window.FinancialDataProvider = FinancialDataProvider;
   window.AccountAggregatorProvider = AccountAggregatorProvider;
   window.MockFinancialDataProvider = MockFinancialDataProvider;
@@ -758,6 +984,8 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     ProviderType,
     ConnectionState,
+    ProviderErrorCategory,     // Phase 27
+    ProviderError,             // Phase 27
     FinancialDataProvider,
     AccountAggregatorProvider,
     MockFinancialDataProvider,
