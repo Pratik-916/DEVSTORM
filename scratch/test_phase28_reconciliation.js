@@ -50,4 +50,10 @@ const res4 = engine.reconcileBatch([changedSettled], existing3, account);
 assert.strictEqual(res4.requiresReview.length, 1);
 assert.strictEqual(res4.requiresReview[0].incoming.reconciliation_status, 'pending_review');
 
-console.log("All tests passed!");
+// Test intra-batch duplicates
+const incomingDupes = [validTxn, validTxn];
+const res5 = engine.reconcileBatch(incomingDupes, [], account);
+assert.strictEqual(res5.imported.length, 1);
+assert.strictEqual(res5.duplicates.length, 1);
+
+console.log("6 PASSED, 0 FAILED");

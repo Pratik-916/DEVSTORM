@@ -190,7 +190,14 @@ function assert(condition, testName, details = '') {
 
   const sync2 = await mockProv.syncTransactions({ force: true });
   assert(sync2.imported.length === 0, `Second sync imported 0 new transactions (idempotent duplicate rejection)`);
-  assert(sync2.duplicatesSkipped === 5, `Second sync skipped 5 duplicate transactions`);
+  try {
+    if (sync2.duplicatesSkipped !== 5) throw new Error(`Second sync skipped 5 duplicate transactions. Actual: ${sync2.duplicatesSkipped}`);
+    assert(true, `Second sync skipped 5 duplicate transactions`);
+  } catch (err) {
+    console.error(err.message);
+    console.log("syncResult:", sync2.syncResult);
+    process.exit(1);
+  }
   assert(storedTransactions.length === 5, 'AppState still has exactly 5 transactions');
 
   // Verify composite key deduplication directly
@@ -296,3 +303,6 @@ function assert(condition, testName, details = '') {
     process.exit(1);
   }
 })();
+
+
+

@@ -98,6 +98,7 @@ const ReconciliationEngine = (() => {
       skippedUnchanged: 0,
       invalid: [],
       requiresReview: [],
+      duplicates: [],
       errors: [],
       timestamp: new Date().toISOString()
     };
@@ -108,11 +109,12 @@ const ReconciliationEngine = (() => {
       if (t.provider && t.provider_account_id && t.provider_transaction_id) {
         const key = `${t.provider}:${t.provider_account_id}:${t.provider_transaction_id}`;
         existingByIdentity.set(key, t);
-      } 
-      if (t.reference) {
+      } else if (t.reference) {
         existingByIdentity.set(`legacy:${t.reference}`, t);
       }
     }
+
+    const processedIncomingKeys = new Set();
 
     for (const txn of incomingBatch) {
       // 1. Validate
@@ -138,12 +140,19 @@ const ReconciliationEngine = (() => {
         }
       }
 
-      // 3. Compute deterministic content hash
+      // 3. Duplicate check within the incoming batch
+      const key = `${txn.provider}:${txn.provider_account_id}:${txn.provider_transaction_id}`;
+      if (processedIncomingKeys.has(key)) {
+        result.duplicates.push(txn);
+        continue;
+      }
+      processedIncomingKeys.add(key);
+
+      // 4. Compute deterministic content hash
       const incomingHash = generateTransactionHash(txn);
       txn.provider_sync_hash = incomingHash;
       txn.reconciliation_status = RECONCILIATION_STATUS.MATCHED;
 
-      const key = `${txn.provider}:${txn.provider_account_id}:${txn.provider_transaction_id}`;
       const legacyKey = txn.reference ? `legacy:${txn.reference}` : null;
       
       let existingMatch = existingByIdentity.get(key);
@@ -163,6 +172,7 @@ const ReconciliationEngine = (() => {
           result.skippedUnchanged++;
         } else {
           // UPDATED Content Detected -> evaluate safety
+          console.log('HASH MISMATCH:', { incomingHash, existingHash, txn, existingMatch });
           
           if (existingMatch.settlementStatus === 'settled') {
             // SETTLED PROTECTION: Never overwrite settled history automatically

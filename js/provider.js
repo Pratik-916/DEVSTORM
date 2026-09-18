@@ -855,6 +855,7 @@ class MockFinancialDataProvider extends FinancialDataProvider {
         if (existingCompositeKeys.has(pKey)) return false;
         return true;
       });
+      syncResult.skippedUnchanged = normalizedBatch.length - syncResult.imported.length;
 
       if (syncResult.imported.length > 0 && typeof AppState !== 'undefined' && typeof AppState.addTransactionsBatch === 'function') {
         await AppState.addTransactionsBatch(syncResult.imported);
@@ -879,14 +880,16 @@ class MockFinancialDataProvider extends FinancialDataProvider {
 
     this._notify();
 
-    console.log(`[FinancialDataProvider] Sync complete: ${newTransactions.length} new transactions imported (${normalizedBatch.length - newTransactions.length} duplicates skipped).`);
+    console.log(`[FinancialDataProvider] Sync complete: ${syncResult.imported.length} new, ${syncResult.updated.length} updated, ${syncResult.skippedUnchanged} unchanged, ${syncResult.requiresReview.length} require review.`);
 
     return {
       status: this.getSyncStatus(),
-      imported: newTransactions,
-      count: newTransactions.length,
+      imported: syncResult.imported,
+      updated: syncResult.updated,
+      count: syncResult.imported.length,
       totalBatch: normalizedBatch.length,
-      duplicatesSkipped: normalizedBatch.length - newTransactions.length,
+      duplicatesSkipped: syncResult.skippedUnchanged + (syncResult.duplicates ? syncResult.duplicates.length : 0),
+      syncResult: syncResult
     };
   }
 
