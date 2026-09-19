@@ -698,6 +698,9 @@ const SupabaseService = (() => {
       provider_transaction_id: row.provider_transaction_id || null,
       provider_sync_hash: row.provider_sync_hash || null,
       reconciliation_status: row.reconciliation_status || null,
+      // Phase 29: pending provider correction awaiting merchant review.
+      // null when no review is pending; JSONB object when correction is pending.
+      pending_correction: row.pending_correction || null,
       createdAt: row.created_at || new Date().toISOString(),
       updatedAt: row.updated_at || null,
     };
@@ -728,6 +731,9 @@ const SupabaseService = (() => {
       provider_transaction_id: txn.provider_transaction_id || null,
       provider_sync_hash: txn.provider_sync_hash || null,
       reconciliation_status: txn.reconciliation_status || null,
+      // Phase 29: preserve pending_correction JSONB through normal upserts.
+      // undefined means "don't touch the column"; null means "clear it".
+      ...(txn.pending_correction !== undefined ? { pending_correction: txn.pending_correction } : {}),
       created_at: txn.createdAt || new Date().toISOString(),
       updated_at: txn.updatedAt || null,
     };
@@ -890,6 +896,8 @@ const SupabaseService = (() => {
       if (updates.provider_sync_hash !== undefined) rowUpdates.provider_sync_hash = updates.provider_sync_hash;
       if (updates.reconciliation_status !== undefined) rowUpdates.reconciliation_status = updates.reconciliation_status;
       if (updates.updatedAt !== undefined) rowUpdates.updated_at = updates.updatedAt;
+      // Phase 29: pending_correction may be set to a JSONB object (review pending) or null (review resolved).
+      if (updates.pending_correction !== undefined) rowUpdates.pending_correction = updates.pending_correction;
 
       let query = _client.from('transactions').update(rowUpdates).eq('id', id);
 

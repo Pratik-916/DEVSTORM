@@ -168,12 +168,18 @@ const ReconciliationEngine = (() => {
         const existingHash = existingMatch.provider_sync_hash || generateTransactionHash(existingMatch);
         
         if (incomingHash === existingHash) {
-          // UNCHANGED
+          // UNCHANGED — exact same content as what's already stored
+          result.skippedUnchanged++;
+        } else if (
+          // Phase 29: incoming hash already matches the hash stored in pending_correction.
+          // This means the provider re-sent the same correction that's already awaiting review.
+          // Treat as UNCHANGED to prevent duplicate review creation.
+          existingMatch.pending_correction &&
+          existingMatch.pending_correction.provider_sync_hash === incomingHash
+        ) {
           result.skippedUnchanged++;
         } else {
           // UPDATED Content Detected -> evaluate safety
-          console.log('HASH MISMATCH:', { incomingHash, existingHash, txn, existingMatch });
-          
           if (existingMatch.settlementStatus === 'settled') {
             // SETTLED PROTECTION: Never overwrite settled history automatically
             txn.reconciliation_status = RECONCILIATION_STATUS.PENDING_REVIEW;

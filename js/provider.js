@@ -828,8 +828,44 @@ class MockFinancialDataProvider extends FinancialDataProvider {
         }
       }
       
-      if (syncResult.requiresReview.length > 0 || syncResult.invalid.length > 0) {
+      // Phase 29: Persist REQUIRES_REVIEW items as pending_correction on the existing transaction.
+      // This converts the in-memory review queue into a durable Supabase record.
+      // If a previous pending_correction exists for the same transaction, it is replaced
+      // by the newer correction — the stored correction always reflects the most recent
+      // provider payload, preventing stale reviews.
+      if (syncResult.requiresReview.length > 0) {
         console.warn(`[FinancialDataProvider] Sync warnings: ${syncResult.requiresReview.length} require review, ${syncResult.invalid.length} invalid.`);
+        if (typeof AppState !== 'undefined' && typeof AppState.updateTransaction === 'function') {
+          for (const reviewItem of syncResult.requiresReview) {
+            const { existing, incoming, reason } = reviewItem;
+            if (!existing || !existing.id) continue;
+
+            // Build the pending correction payload — contains enough info to reproduce
+            // the comparison display and to detect stale resolutions via hash.
+            const pendingCorrection = {
+              provider: incoming.provider,
+              provider_account_id: incoming.provider_account_id,
+              provider_transaction_id: incoming.provider_transaction_id,
+              provider_sync_hash: incoming.provider_sync_hash,
+              amount: incoming.amount,
+              type: incoming.type,
+              date: incoming.date,
+              settlementStatus: incoming.settlementStatus,
+              description: incoming.description,
+              currency: incoming.currency || 'INR',
+              reason: reason || 'Provider correction requires review',
+              received_at: new Date().toISOString(),
+            };
+
+            await AppState.updateTransaction(existing.id, {
+              pending_correction: pendingCorrection,
+              reconciliation_status: 'pending_review',
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
+      } else if (syncResult.invalid.length > 0) {
+        console.warn(`[FinancialDataProvider] Sync warnings: ${syncResult.invalid.length} invalid transactions rejected.`);
       }
     } else {
       // Fallback manual deduplication if reconciliation engine isn't loaded

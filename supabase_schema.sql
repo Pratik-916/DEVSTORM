@@ -52,6 +52,21 @@ ADD COLUMN IF NOT EXISTS provider_sync_hash TEXT,
 ADD COLUMN IF NOT EXISTS reconciliation_status TEXT,
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
 
+-- Phase 29: Reconciliation Review & Resolution
+-- Stores the pending provider correction for transactions requiring merchant review.
+-- Financial engines (CashflowEngine, StatementEngine, etc.) read only the top-level
+-- columns (amount, type, date) and naturally ignore this JSONB payload, guaranteeing
+-- financial invariance while the review is pending.
+-- pending_correction is null when no review is pending.
+ALTER TABLE public.transactions
+ADD COLUMN IF NOT EXISTS pending_correction JSONB;
+
+-- Index to efficiently find all transactions with a pending review for a business.
+-- Used by the review banner to display unresolved review count.
+CREATE INDEX IF NOT EXISTS idx_transactions_pending_correction
+ON public.transactions (business_id)
+WHERE pending_correction IS NOT NULL;
+
 -- 3. FINANCIAL ACCOUNTS TABLE
 -- Tracks connected banking, UPI, and digital merchant accounts for a business.
 CREATE TABLE IF NOT EXISTS public.financial_accounts (

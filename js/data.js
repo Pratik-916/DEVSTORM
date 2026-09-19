@@ -1177,6 +1177,141 @@ const AppState = (() => {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
+  /**
+   * Phase 29: Return transactions that have a pending provider correction awaiting review.
+   * These are transactions where pending_correction !== null.
+   * @returns {Array<Object>}
+   */
+  function getPendingReviews() {
+    return _store.transactions.filter(t => t.pending_correction != null);
+  }
+
+  /**
+   * Phase 29: Resolve a reconciliation review.
+   *
+   * SAFETY GUARD: Before applying resolution, verifies that the stored
+   * pending_correction.provider_sync_hash matches expectedHash. If it
+   * doesn't match, the review has been superseded by a newer provider
+   * correction; the resolution is rejected to prevent a stale modal from
+   * overwriting the newer review.
+   *
+   * ACCEPT  — applies provider-controlled fields, preserves Cashly-owned fields.
+   * REJECT  — preserves all active fields unchanged.
+   * In both paths, pending_correction is cleared and provider_sync_hash is
+   * updated to the resolved correction's hash so the same provider payload
+   * does not trigger a new review on the next sync.
+   *
+   * PERSISTENCE: The resolution MUST be persisted to Supabase before the
+   * in-memory state is considered resolved. If persistence fails, the
+   * function returns { success: false } and the in-memory state is reverted
+   * so the review remains actionable.
+   *
+   * @param {string}  txnId        Local transaction ID
+   * @param {'accept'|'reject'} decision  Resolution decision
+   * @param {string}  expectedHash provider_sync_hash of the correction being resolved (stale guard)
+   * @returns {Promise<{success: boolean, txn?: Object, error?: string, stale?: boolean}>}
+   */
+  async function resolveReview(txnId, decision, expectedHash) {
+    // 1. Find the transaction
+    const idx = _store.transactions.findIndex(t => t.id === txnId);
+    if (idx === -1) {
+      return { success: false, error: 'Transaction not found.' };
+    }
+
+    const txn = _store.transactions[idx];
+
+    // 2. Verify the review still exists
+    if (!txn.pending_correction) {
+      return { success: false, error: 'No pending review found for this transaction.' };
+    }
+
+    // 3. Stale-hash guard: ensure the review being resolved is the one currently stored
+    const storedHash = txn.pending_correction.provider_sync_hash;
+    if (storedHash !== expectedHash) {
+      return {
+        success: false,
+        stale: true,
+        error: 'Provider data changed. Please review the latest correction.',
+      };
+    }
+
+    // 4. Compute the resolved transaction state
+    const correction = txn.pending_correction;
+    const resolvedHash = correction.provider_sync_hash;
+    const now = new Date().toISOString();
+
+    let resolvedTxn;
+    if (decision === 'accept') {
+      // ACCEPT: Apply provider-controlled fields; preserve Cashly-owned fields.
+      resolvedTxn = {
+        ...txn,
+        // Provider-controlled fields
+        amount: typeof correction.amount === 'number' ? correction.amount : txn.amount,
+        type: correction.type || txn.type,
+        date: correction.date || txn.date,
+        settlementStatus: correction.settlementStatus || txn.settlementStatus,
+        description: correction.description || txn.description,
+        currency: correction.currency || txn.currency,
+        // Resolution metadata
+        provider_sync_hash: resolvedHash,
+        reconciliation_status: 'auto_updated',
+        pending_correction: null,
+        updatedAt: now,
+      };
+    } else {
+      // REJECT (keep existing): Preserve all active fields unchanged.
+      // Only update the hash so the same provider correction won't re-trigger a review.
+      resolvedTxn = {
+        ...txn,
+        provider_sync_hash: resolvedHash,
+        reconciliation_status: 'matched',
+        pending_correction: null,
+        updatedAt: now,
+      };
+    }
+
+    // 5. Attempt persistence BEFORE mutating in-memory state
+    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+      try {
+        const ok = await SupabaseService.updateTransaction(txnId, {
+          amount: resolvedTxn.amount,
+          type: resolvedTxn.type,
+          date: resolvedTxn.date,
+          settlementStatus: resolvedTxn.settlementStatus,
+          description: resolvedTxn.description,
+          provider_sync_hash: resolvedTxn.provider_sync_hash,
+          reconciliation_status: resolvedTxn.reconciliation_status,
+          pending_correction: null,
+          updatedAt: resolvedTxn.updatedAt,
+        });
+        if (!ok) {
+          return {
+            success: false,
+            error: 'Failed to save resolution. Please check your connection and try again.',
+          };
+        }
+      } catch (err) {
+        return {
+          success: false,
+          error: 'Failed to save resolution. Please check your connection and try again.',
+        };
+      }
+    } else if (typeof SupabaseService !== 'undefined') {
+      // Supabase is configured but not connected (offline)
+      return {
+        success: false,
+        error: 'No connection. Resolution cannot be saved offline. Please reconnect and try again.',
+      };
+    }
+    // If SupabaseService is not configured at all (pure local demo), proceed.
+
+    // 6. Apply to in-memory store only after successful persistence
+    _store.transactions[idx] = resolvedTxn;
+    refreshAllViews();
+
+    return { success: true, txn: resolvedTxn };
+  }
+
   return {
     init,
     setCurrentUser,
@@ -1194,6 +1329,8 @@ const AppState = (() => {
     deleteTransaction,
     settleTransaction,
     settleTransactionsBatch,
+    getPendingReviews,      // Phase 29
+    resolveReview,          // Phase 29
     getFinancialAccounts,
     addFinancialAccount,
     updateFinancialAccount,
