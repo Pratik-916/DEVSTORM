@@ -1271,9 +1271,9 @@ const AppState = (() => {
     }
 
     // 5. Attempt persistence BEFORE mutating in-memory state
-    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected() && typeof SupabaseService.resolveTransactionReview === 'function') {
       try {
-        const ok = await SupabaseService.updateTransaction(txnId, {
+        const result = await SupabaseService.resolveTransactionReview(txnId, {
           amount: resolvedTxn.amount,
           type: resolvedTxn.type,
           date: resolvedTxn.date,
@@ -1283,11 +1283,19 @@ const AppState = (() => {
           reconciliation_status: resolvedTxn.reconciliation_status,
           pending_correction: null,
           updatedAt: resolvedTxn.updatedAt,
-        });
-        if (!ok) {
+        }, expectedHash);
+
+        if (!result.success) {
+          if (result.stale) {
+            return {
+              success: false,
+              stale: true,
+              error: 'Provider data changed. Please review the latest correction.',
+            };
+          }
           return {
             success: false,
-            error: 'Failed to save resolution. Please check your connection and try again.',
+            error: result.error || 'Failed to save resolution. Please check your connection and try again.',
           };
         }
       } catch (err) {

@@ -919,6 +919,61 @@ const SupabaseService = (() => {
     }
   }
 
+  /**
+   * Phase 29: Atomic resolution of a pending review.
+   * Ensures that the update only succeeds if the stored provider_sync_hash inside pending_correction
+   * exactly matches the expectedHash.
+   */
+  async function resolveTransactionReview(id, updates, expectedHash) {
+    if (!isConnected() || !id) return { success: false, error: 'Not connected' };
+
+    try {
+      const rowUpdates = {};
+      if (updates.type !== undefined) rowUpdates.type = updates.type;
+      if (updates.amount !== undefined) rowUpdates.amount = Number(updates.amount) || 0;
+      if (updates.source !== undefined) rowUpdates.source = updates.source;
+      if (updates.paymentMethod !== undefined) rowUpdates.payment_method = updates.paymentMethod;
+      if (updates.settlementStatus !== undefined) rowUpdates.settlement_status = updates.settlementStatus;
+      if (updates.description !== undefined) rowUpdates.description = updates.description;
+      if (updates.date !== undefined) rowUpdates.transaction_date = updates.date;
+      if (updates.provider_sync_hash !== undefined) rowUpdates.provider_sync_hash = updates.provider_sync_hash;
+      if (updates.reconciliation_status !== undefined) rowUpdates.reconciliation_status = updates.reconciliation_status;
+      if (updates.updatedAt !== undefined) rowUpdates.updated_at = updates.updatedAt;
+      if (updates.pending_correction !== undefined) rowUpdates.pending_correction = updates.pending_correction;
+
+      let query = _client.from('transactions').update(rowUpdates).eq('id', id);
+
+      if (_currentBusiness && _currentBusiness.id) {
+        query = query.eq('business_id', _currentBusiness.id);
+      } else if (_currentUser && _currentUser.id) {
+        query = query.eq('user_id', _currentUser.id);
+      }
+
+      // Phase 29: Atomic stale-guard check using JSONB path matching
+      if (expectedHash) {
+        query = query.eq('pending_correction->>provider_sync_hash', expectedHash);
+      }
+
+      // Force returning updated rows to confirm matching occurred
+      const { data, error } = await query.select('id');
+
+      if (error) {
+        console.warn('[Cashly] Notice resolving review in Supabase:', error.message || error);
+        return { success: false, error: error.message || error };
+      }
+
+      if (!data || data.length === 0) {
+        // Zero rows matched, meaning either the ID didn't exist or the expectedHash mismatched (stale data).
+        return { success: false, stale: true };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.warn('[Cashly] Notice resolving review in Supabase:', err.message || err);
+      return { success: false, error: err.message || err };
+    }
+  }
+
   /* ============================================================
      FINANCIAL ACCOUNTS PERSISTENCE METHODS
      ============================================================ */
@@ -1821,6 +1876,7 @@ const SupabaseService = (() => {
     insertTransaction,
     insertTransactions,
     updateTransaction,
+    resolveTransactionReview, // Phase 29
     deleteTransaction,
     fetchFinancialAccounts,
     insertFinancialAccount,
