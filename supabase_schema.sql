@@ -405,3 +405,7 @@ BEGIN
     RETURN NEXT v_business;
 END;
 $$;
+
+-- Secure the RPC function: Only authenticated users can execute it
+REVOKE EXECUTE ON FUNCTION public.get_or_create_business(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_or_create_business(TEXT) TO authenticated;
