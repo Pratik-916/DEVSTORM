@@ -315,8 +315,8 @@ group('Group 24: supabase.js updateFinancialAccount Phase 27 fields', () => {
 });
 
 group('Group 25: SW cache version bump', () => {
-  // Phase 29 bumped SW cache to v18 — v17 or v18 are both valid here
-  assert(swSrc.includes('cashly-cache-v17') || swSrc.includes('cashly-cache-v18'), 'SW bumped to v17+');
+  // Phase 30 bumped SW cache to v19 — v17, v18, or v19 are valid here
+  assert(swSrc.includes('cashly-cache-v17') || swSrc.includes('cashly-cache-v18') || swSrc.includes('cashly-cache-v19'), 'SW bumped to v17+');
 });
 
 console.log(`\n============================`);
