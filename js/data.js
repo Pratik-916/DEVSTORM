@@ -611,7 +611,7 @@ const AppState = (() => {
    * Add a new transaction (manual entry or auto-import).
    * @param {Object} txnData
    */
-  function addTransaction(txnData) {
+  async function addTransaction(txnData) {
     const existingId = txnData.id ? _store.transactions.find(t => t.id === txnData.id) : null;
     if (existingId) return existingId;
     if (txnData.reference) {
@@ -648,15 +648,17 @@ const AppState = (() => {
       createdAt: txnData.createdAt || new Date().toISOString(),
     };
 
+    // Phase 31: Secure validation before optimistic mutation
+    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+      try {
+        await SupabaseService.insertTransaction(newTxn);
+      } catch (err) {
+        throw new Error('Failed to save transaction to server: ' + (err.message || 'Unknown error'));
+      }
+    }
+
     _store.transactions.unshift(newTxn);
     refreshAllViews();
-
-    // Save manual transaction to Supabase if connected
-    if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-      SupabaseService.insertTransaction(newTxn).catch(err => {
-        console.warn('[Cashly] Notice saving transaction to Supabase:', err.message || err);
-      });
-    }
 
     return newTxn;
   }
@@ -688,21 +690,22 @@ const AppState = (() => {
         userId: raw.userId || (user ? user.id : null),
       };
 
-      _store.transactions.unshift(item);
       existingIds.add(id);
       if (ref) existingRefs.add(ref);
       added.push(item);
     }
 
     if (added.length > 0) {
-      refreshAllViews();
       if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
         try {
           await SupabaseService.insertTransactions(added);
         } catch (err) {
-          console.warn('[Cashly] Notice saving transaction batch to Supabase:', err.message || err);
+          throw new Error('Failed to save transaction batch to server: ' + (err.message || 'Unknown error'));
         }
       }
+      
+      _store.transactions.unshift(...added);
+      refreshAllViews();
     }
     return added;
   }
@@ -710,23 +713,27 @@ const AppState = (() => {
   /**
    * Update an existing transaction by id
    */
-  function updateTransaction(id, updatedData) {
+  async function updateTransaction(id, updatedData) {
     const idx = _store.transactions.findIndex(t => t.id === id);
     if (idx !== -1) {
-      _store.transactions[idx] = {
+      const mergedTxn = {
         ..._store.transactions[idx],
         ...updatedData,
         userId: _store.transactions[idx].userId || (_store.currentUser ? _store.currentUser.id : null),
         amount: Number(updatedData.amount !== undefined ? updatedData.amount : _store.transactions[idx].amount),
       };
 
-      refreshAllViews();
-
+      // Phase 31: Secure validation before optimistic mutation
       if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-        SupabaseService.insertTransaction(_store.transactions[idx]).catch(err => {
-          console.warn('[Cashly] Notice updating transaction in Supabase:', err.message || err);
-        });
+        try {
+          await SupabaseService.insertTransaction(mergedTxn);
+        } catch (err) {
+          throw new Error('Failed to update transaction on server: ' + (err.message || 'Unknown error'));
+        }
       }
+
+      _store.transactions[idx] = mergedTxn;
+      refreshAllViews();
 
       return _store.transactions[idx];
     }
@@ -736,17 +743,19 @@ const AppState = (() => {
   /**
    * Delete a transaction by id
    */
-  function deleteTransaction(id) {
+  async function deleteTransaction(id) {
     const idx = _store.transactions.findIndex(t => t.id === id);
     if (idx !== -1) {
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
+        try {
+          await SupabaseService.deleteTransaction(id);
+        } catch (err) {
+          throw new Error('Failed to delete transaction from server: ' + (err.message || 'Unknown error'));
+        }
+      }
+
       const removed = _store.transactions.splice(idx, 1)[0];
       refreshAllViews();
-
-      if (typeof SupabaseService !== 'undefined' && SupabaseService.isConnected()) {
-        SupabaseService.deleteTransaction(id).catch(err => {
-          console.warn('[Cashly] Notice deleting transaction from Supabase:', err.message || err);
-        });
-      }
 
       return true;
     }

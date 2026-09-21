@@ -620,47 +620,30 @@ const SupabaseService = (() => {
 
     await ensureConnected();
 
-    // 3. Try to fetch from Supabase
+    // 3. Try to fetch/create securely from Supabase using Phase 31 RPC
+    const defaultName = user.email ? (user.email.split('@')[0].toUpperCase() + ' Store') : 'Demo Shop';
     if (isConnected()) {
       try {
-        const { data, error } = await _client
-          .from('businesses')
-          .select('*')
-          .eq('owner_id', user.id);
-
+        const { data, error } = await _client.rpc('get_or_create_business', { default_name: defaultName });
         if (!error && data && data.length > 0) {
           _currentBusiness = data[0];
           setBusiness(_currentBusiness);
           return _currentBusiness;
         }
       } catch (err) {
-        console.warn('[Cashly] Notice fetching user business:', err.message || err);
+        console.warn('[Cashly] Notice fetching/creating user business securely:', err.message || err);
       }
     }
 
-    // 4. Create new Business profile for this user
-    const defaultName = user.email ? (user.email.split('@')[0].toUpperCase() + ' Store') : 'Demo Shop';
-    let newBusiness = {
+    // 4. Fallback for offline or local-only mode
+    _currentBusiness = {
       id: generateUUID(),
       owner_id: user.id,
       name: defaultName,
       created_at: new Date().toISOString(),
     };
-
-    if (isConnected()) {
-      try {
-        const res = await _client.from('businesses').insert([newBusiness]);
-        if (res && res.data && res.data[0]) {
-          newBusiness = res.data[0];
-        }
-      } catch (err) {
-        console.warn('[Cashly] Notice creating business profile in Supabase:', err.message || err);
-      }
-    }
-
-    _currentBusiness = newBusiness;
-    setBusiness(newBusiness);
-    return newBusiness;
+    setBusiness(_currentBusiness);
+    return _currentBusiness;
   }
 
   /* ============================================================

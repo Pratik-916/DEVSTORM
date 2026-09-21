@@ -22,7 +22,10 @@ const suites = [
   { phase: 25, file: 'scratch/test_phase25_action_tracking.js' },
   { phase: 26, file: 'scratch/test_phase26_persistence.js' },
   { phase: 27, file: 'scratch/test_phase27_provider.js' },
-  { phase: 28, file: 'scratch/test_phase28_reconciliation.js' }
+  { phase: 28, file: 'scratch/test_phase28_reconciliation.js' },
+  { phase: 29, file: 'scratch/test_phase29_resolution.js' },
+  { phase: 30, file: 'scratch/test_phase30_operations.js' },
+  { phase: 31, file: 'scratch/test_phase31_security.js' }
 ];
 
 console.log('======================================================');

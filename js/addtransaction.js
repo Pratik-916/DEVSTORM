@@ -378,7 +378,7 @@ const AddTransaction = (() => {
       close();
     } catch (err) {
       console.warn('[Cashly] Error saving transaction:', err);
-      showSuccess('Unable to save transaction. Please try again.');
+      alert('Unable to save transaction: ' + (err.message || 'Network error'));
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;

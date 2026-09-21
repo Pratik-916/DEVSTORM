@@ -208,8 +208,7 @@ ON public.transactions
 FOR SELECT
 TO authenticated
 USING (
-    auth.uid() = user_id 
-    OR business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
+    business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
 );
 
 CREATE POLICY "Users can insert own transactions"
@@ -217,8 +216,7 @@ ON public.transactions
 FOR INSERT
 TO authenticated
 WITH CHECK (
-    auth.uid() = user_id 
-    OR business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
+    business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
 );
 
 CREATE POLICY "Users can update own transactions"
@@ -226,12 +224,10 @@ ON public.transactions
 FOR UPDATE
 TO authenticated
 USING (
-    auth.uid() = user_id 
-    OR business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
+    business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
 )
 WITH CHECK (
-    auth.uid() = user_id 
-    OR business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
+    business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
 );
 
 CREATE POLICY "Users can delete own transactions"
@@ -239,8 +235,7 @@ ON public.transactions
 FOR DELETE
 TO authenticated
 USING (
-    auth.uid() = user_id 
-    OR business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
+    business_id IN (SELECT id FROM public.businesses WHERE owner_id = auth.uid())
 );
 
 -- 3. Financial Accounts Policies
@@ -378,3 +373,35 @@ ON public.financial_accounts (business_id, provider_account_id);
 CREATE INDEX IF NOT EXISTS idx_financial_accounts_connection_status
 ON public.financial_accounts (business_id, connection_status);
 
+-- ============================================================
+-- PHASE 31: SECURE BUSINESS CREATION FUNCTION
+-- ============================================================
+-- Prevents clients from assigning arbitrary owner_ids or generating UUIDs.
+CREATE OR REPLACE FUNCTION public.get_or_create_business(default_name TEXT)
+RETURNS SETOF public.businesses
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_business public.businesses;
+    v_uid UUID;
+BEGIN
+    v_uid := auth.uid();
+    IF v_uid IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    -- Try to fetch existing
+    SELECT * INTO v_business FROM public.businesses WHERE owner_id = v_uid LIMIT 1;
+    
+    -- If it doesn't exist, create it safely
+    IF NOT FOUND THEN
+        INSERT INTO public.businesses (owner_id, name)
+        VALUES (v_uid, COALESCE(default_name, 'My Business'))
+        RETURNING * INTO v_business;
+    END IF;
+
+    RETURN NEXT v_business;
+END;
+$$;

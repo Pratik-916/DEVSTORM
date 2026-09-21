@@ -241,7 +241,7 @@ const Admin = (() => {
       render();
     } catch (err) {
       console.warn('[Cashly] Admin save transaction error:', err);
-      showToast('Unable to save transaction. Please try again.');
+      showToast('Unable to save transaction: ' + (err.message || 'Network error'));
     } finally {
       if (saveBtn) {
         saveBtn.disabled = false;
