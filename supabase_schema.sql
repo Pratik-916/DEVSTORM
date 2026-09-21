@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS public.businesses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_owner_id UNIQUE (owner_id)
 );
 
 -- 2. TRANSACTIONS TABLE
@@ -392,15 +393,10 @@ BEGIN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
 
-    -- Try to fetch existing
-    SELECT * INTO v_business FROM public.businesses WHERE owner_id = v_uid LIMIT 1;
-    
-    -- If it doesn't exist, create it safely
-    IF NOT FOUND THEN
-        INSERT INTO public.businesses (owner_id, name)
-        VALUES (v_uid, COALESCE(default_name, 'My Business'))
-        RETURNING * INTO v_business;
-    END IF;
+    INSERT INTO public.businesses (owner_id, name)
+    VALUES (v_uid, COALESCE(default_name, 'My Business'))
+    ON CONFLICT (owner_id) DO UPDATE SET owner_id = EXCLUDED.owner_id
+    RETURNING * INTO v_business;
 
     RETURN NEXT v_business;
 END;

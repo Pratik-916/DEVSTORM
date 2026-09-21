@@ -187,12 +187,12 @@ runTest('D1: RPC unauthenticated behavior', () => {
 runTest('D2: RPC owner derivation', () => {
   const rpc = schema.match(/CREATE OR REPLACE FUNCTION public\.get_or_create_business[\s\S]*?END;/)[0];
   assert.strictEqual(rpc.includes('v_uid := auth.uid();'), true);
-  assert.strictEqual(rpc.includes('owner_id = v_uid'), true);
+  assert.strictEqual(rpc.includes('VALUES (v_uid'), true);
 });
 
-runTest('D3: RPC idempotency', () => {
+runTest('D3: RPC idempotency (Atomic concurrent safety)', () => {
   const rpc = schema.match(/CREATE OR REPLACE FUNCTION public\.get_or_create_business[\s\S]*?END;/)[0];
-  assert.strictEqual(rpc.includes('IF NOT FOUND THEN'), true, 'Must check for existing business first');
+  assert.strictEqual(rpc.includes('ON CONFLICT (owner_id) DO UPDATE'), true, 'Must use ON CONFLICT for atomic concurrency');
 });
 
 runTest('D4: RPC privileges strictly granted', () => {
