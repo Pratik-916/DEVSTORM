@@ -543,9 +543,35 @@ const PaymentReadinessEngine = (() => {
                 ${renderStatusBadge(c.status)}
               </div>
             </div>
-            <p style="font-size:11px;color:var(--c-text-secondary);margin:0;line-height:1.4;">
-              ${c.explanation}
-            </p>
+            
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+              <p style="font-size:11px;color:var(--c-text-secondary);margin:0;line-height:1.4;flex:1;">
+                ${c.explanation}
+              </p>
+              ${(() => {
+                if (!c.id) return '';
+                const actId = 'act_pay_' + c.id;
+                const actStatus = (typeof ActionTrackingEngine !== 'undefined') ? ActionTrackingEngine.getStatus(actId) : 'OPEN';
+                
+                if (actStatus === 'COMPLETED') {
+                  return '<span class="badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:10px;">Done</span>';
+                } else if (actStatus === 'IN_PROGRESS') {
+                  return `
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;">
+                      <button type="button" class="btn btn-sm btn-outline" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Scheduled');PaymentReadinessEngine.render('insights-readiness-container');}" title="Mark Scheduled">Scheduled</button>
+                      <button type="button" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Rescheduled');PaymentReadinessEngine.render('insights-readiness-container');}" title="Mark Rescheduled">Rescheduled</button>
+                      <button type="button" class="btn btn-sm btn-ghost" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Awaiting Funds');PaymentReadinessEngine.render('insights-readiness-container');}" title="Mark Awaiting Funds">Awaiting</button>
+                    </div>
+                  `;
+                } else {
+                  return `
+                    <button type="button" class="btn btn-sm btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.startAction('${actId}');PaymentReadinessEngine.render('insights-readiness-container');}" title="Start Action">
+                      Start
+                    </button>
+                  `;
+                }
+              })()}
+            </div>
           </div>
         `;
       }).join('');

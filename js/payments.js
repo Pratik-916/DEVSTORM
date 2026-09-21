@@ -84,6 +84,29 @@ const Payments = (() => {
               <span class="badge ${badgeClass}" style="text-transform:capitalize;">${badgeText}</span>
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-left:var(--sp-2);">
+              ${(() => {
+                if (isPaid || !p.id) return '';
+                const actId = 'act_pay_' + p.id;
+                const actStatus = (typeof ActionTrackingEngine !== 'undefined') ? ActionTrackingEngine.getStatus(actId) : 'OPEN';
+                
+                if (actStatus === 'COMPLETED') {
+                  return '<span class="badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:10px;margin-right:8px;">Done</span>';
+                } else if (actStatus === 'IN_PROGRESS') {
+                  return `
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-right:8px;">
+                      <button type="button" class="btn btn-sm btn-outline" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Scheduled');Payments.render();}" title="Mark Scheduled">Scheduled</button>
+                      <button type="button" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Rescheduled');Payments.render();}" title="Mark Rescheduled">Rescheduled</button>
+                      <button type="button" class="btn btn-sm btn-ghost" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Awaiting Funds');Payments.render();}" title="Mark Awaiting Funds">Awaiting</button>
+                    </div>
+                  `;
+                } else {
+                  return `
+                    <button type="button" class="btn btn-sm btn-secondary" style="font-size:10px;padding:3px 8px;margin-right:8px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.startAction('${actId}');Payments.render();}" title="Start Action">
+                      Start Action
+                    </button>
+                  `;
+                }
+              })()}
               <button type="button" class="btn btn-secondary btn-sm" title="Edit Obligation" onclick="Payments.openEdit('${escapeHtml(p.id)}')" style="padding:6px;border-radius:6px;min-width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
               </button>

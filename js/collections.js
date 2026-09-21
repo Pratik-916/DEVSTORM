@@ -463,14 +463,28 @@ const CollectionsEngine = (() => {
                   <td style="padding:8px 10px;vertical-align:middle;text-align:right;font-weight:700;color:var(--c-text-primary);">${fmt(item.amount)}</td>
                   <td style="padding:8px 10px;vertical-align:middle;text-align:center;">${priorityBadge(item.priority)}</td>
                   <td style="padding:8px 10px;vertical-align:middle;text-align:center;">
-                    <button
-                      type="button"
-                      class="btn btn-secondary btn-sm"
-                      onclick="if(typeof SettlementReconciliationEngine!=='undefined')SettlementReconciliationEngine.openReconciliationModal();"
-                      title="Open Settlement Reconciliation to confirm this payment"
-                      style="padding:4px 8px;font-size:11px;">
-                      Reconcile
-                    </button>
+                    ${(() => {
+                      const actId = 'act_col_' + item.id;
+                      const actStatus = (typeof ActionTrackingEngine !== 'undefined') ? ActionTrackingEngine.getStatus(actId) : 'OPEN';
+                      
+                      if (actStatus === 'COMPLETED') {
+                        return '<span class="badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:10px;">Done</span>';
+                      } else if (actStatus === 'IN_PROGRESS') {
+                        return `
+                          <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;">
+                            <button type="button" class="btn btn-sm btn-outline" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Contacted');CollectionsEngine.render('insights-collections-container');}" title="Mark Contacted">Contacted</button>
+                            <button type="button" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: Promised Payment');CollectionsEngine.render('insights-collections-container');}" title="Mark Promised Payment">Promised</button>
+                            <button type="button" class="btn btn-sm btn-ghost" style="font-size:10px;padding:3px 6px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.completeAction('${actId}', 'OUTCOME: No Response');CollectionsEngine.render('insights-collections-container');}" title="Mark No Response">No Resp</button>
+                          </div>
+                        `;
+                      } else {
+                        return `
+                          <button type="button" class="btn btn-sm btn-secondary" style="font-size:10px;padding:3px 8px;" onclick="if(typeof ActionTrackingEngine!=='undefined'){ActionTrackingEngine.startAction('${actId}');CollectionsEngine.render('insights-collections-container');}" title="Start Action">
+                            Start
+                          </button>
+                        `;
+                      }
+                    })()}
                   </td>
                 </tr>
               `).join('')}

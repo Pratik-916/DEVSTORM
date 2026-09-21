@@ -456,6 +456,12 @@ const ActionTrackingEngine = (() => {
       const all = getActions('ALL');
       matched = all.find(a => a.id === id);
     }
+    
+    // Support Phase 30 contextual actions (ad-hoc IDs)
+    if (!matched) {
+      matched = { id, actionKey: id, type: 'contextual', priority: 'medium', title: 'Contextual Action' };
+    }
+
     if (matched) {
       const updatedSnapshot = { ...matched, ...record };
       _historyStore.set(id, updatedSnapshot);
