@@ -25,7 +25,8 @@ const suites = [
   { phase: 28, file: 'scratch/test_phase28_reconciliation.js' },
   { phase: 29, file: 'scratch/test_phase29_resolution.js' },
   { phase: 30, file: 'scratch/test_phase30_operations.js' },
-  { phase: 31, file: 'scratch/test_phase31_security.js' }
+  { phase: 31, file: 'scratch/test_phase31_security.js' },
+  { phase: 32, file: 'scratch/test_phase32_backend.js' },
 ];
 
 console.log('======================================================');

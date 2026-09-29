@@ -405,3 +405,77 @@ $$;
 -- Secure the RPC function: Only authenticated users can execute it
 REVOKE EXECUTE ON FUNCTION public.get_or_create_business(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_or_create_business(TEXT) TO authenticated;
+
+-- ============================================================
+-- PHASE 32: SECURE PROVIDER BACKEND INFRASTRUCTURE
+-- ============================================================
+
+-- 10. WEBHOOK EVENTS TABLE
+-- Purpose: Idempotency guard for inbound provider webhook deliveries.
+--   Ensures that if a provider delivers the same event_id more than once,
+--   only the first delivery is processed. The second is safely ignored via
+--   the unique constraint on (provider, event_id).
+--
+-- NOT for financial logging — ReconciliationEngine remains the canonical layer.
+-- Edge Functions write to this table using the service-role key (server-side only).
+--
+-- Fields kept minimal: only what is required for safe idempotency.
+CREATE TABLE IF NOT EXISTS public.webhook_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- The provider that delivered this event (e.g. 'mock', 'aa', 'plaid').
+    provider TEXT NOT NULL,
+    -- The stable, provider-assigned delivery/event ID.
+    -- Used as the idempotency key together with provider.
+    event_id TEXT NOT NULL,
+    -- UTC timestamp when the event was first received by the Edge Function.
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Processing lifecycle: 'received' | 'processing' | 'processed' | 'failed' | 'duplicate'
+    processing_status TEXT NOT NULL DEFAULT 'received'
+        CHECK (processing_status IN ('received', 'processing', 'processed', 'failed', 'duplicate')),
+    -- UTC timestamp when processing completed (NULL until resolved).
+    processed_at TIMESTAMPTZ,
+    -- Safe, non-sensitive error summary if processing failed. NEVER store raw DB errors.
+    error_details TEXT,
+    CONSTRAINT unique_provider_event_id UNIQUE (provider, event_id)
+);
+
+-- Index for fast idempotency lookups by provider + event_id (covered by the UNIQUE constraint).
+-- Additional index for status-based operational queries (e.g. retry failed events).
+CREATE INDEX IF NOT EXISTS idx_webhook_events_status
+    ON public.webhook_events (provider, processing_status, received_at DESC);
+
+-- Enable RLS on webhook_events.
+-- Edge Functions use the service-role key (bypasses RLS safely server-side).
+-- Authenticated users CANNOT read or write webhook_events directly from the browser.
+ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
+
+-- No authenticated user policy — webhook_events is exclusively managed by Edge Functions.
+-- This intentionally leaves no user-facing policy, so no browser client can touch this table.
+
+-- PHASE 32: TRANSACTION PROVIDER IDEMPOTENCY
+-- Purpose: Prevent duplicate financial transactions from repeated webhook deliveries.
+--
+-- Standard UNIQUE constraint does NOT handle NULL values correctly in PostgreSQL:
+-- multiple rows with NULL in any column are treated as distinct and bypass UNIQUE.
+-- Manual/legacy transactions legitimately have NULL provider fields, so a plain
+-- UNIQUE(provider, provider_account_id, provider_transaction_id) would break them.
+--
+-- Solution: A PARTIAL UNIQUE INDEX scoped only to rows where all three provider
+-- identity fields are NOT NULL. This guarantees:
+--   - Provider transactions: cannot be duplicated.
+--   - Manual/legacy transactions: unaffected (NULLs excluded from the index).
+--
+-- Reuses canonical identity established in Phase 28: provider + provider_account_id + provider_transaction_id.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_provider_unique
+    ON public.transactions (provider, provider_account_id, provider_transaction_id)
+    WHERE provider IS NOT NULL
+      AND provider_account_id IS NOT NULL
+      AND provider_transaction_id IS NOT NULL;
+
+-- PHASE 32: FINANCIAL ACCOUNTS PROVIDER LOOKUP INDEX
+-- Purpose: Edge Functions resolve business ownership by looking up financial_accounts
+-- using provider + provider_account_id (NOT business_id from the external payload).
+-- This index ensures that lookup is fast even at scale.
+CREATE INDEX IF NOT EXISTS idx_financial_accounts_provider_lookup
+    ON public.financial_accounts (provider, provider_account_id)
+    WHERE provider_account_id IS NOT NULL;
