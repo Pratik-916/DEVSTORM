@@ -1,7 +1,8 @@
-﻿/**
+/**
  * provider-settlement-sync/index.ts
  * ============================================================
- * Phase 33 — Razorpay Settlement Sync Edge Function
+ * Phase 34 — Provider Operations: Automated Settlement Sync
+ * (Extended from Phase 33)
  *
  * SINGLE-MERCHANT RAZORPAY TEST MODE ONLY.
  *  
@@ -64,8 +65,10 @@ function razorpayAuthHeader(keyId: string, keySecret: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Razorpay settlement recon API fetch
+// Razorpay settlement recon API fetch (with timeout)
 // ---------------------------------------------------------------------------
+
+const FETCH_TIMEOUT_MS = 30_000; // 30 seconds — Razorpay SLA
 
 async function fetchReconPage(
   keyId: string,
@@ -81,18 +84,33 @@ async function fetchReconPage(
   });
 
   const url = `${RAZORPAY_API_BASE}/settlements/recon/combined?${params}`;
-  const resp = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: razorpayAuthHeader(keyId, keySecret),
-      "Content-Type": "application/json",
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: razorpayAuthHeader(keyId, keySecret),
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error(`[settlement-sync] Recon API timeout (>${FETCH_TIMEOUT_MS}ms) for settlement ${settlementId}`);
+      throw new Error("PROVIDER_TIMEOUT");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!resp.ok) {
     // Safe log: no secrets, only HTTP status
     console.error(`[settlement-sync] Razorpay recon API HTTP ${resp.status} for ${settlementId}`);
-    throw new Error(`Razorpay recon API returned HTTP ${resp.status}`);
+    throw new Error(`PROVIDER_API_ERROR:${resp.status}`);
   }
 
   const body = await resp.json() as Record<string, unknown>;
@@ -112,6 +130,10 @@ async function resolveSettlement(
 ): Promise<{ payment_ids: string[]; settled: number; not_found: number; errors: number }> {
   const { id: eventId, settlement_id: settlementId, business_id: businessId } = settlementEvent;
 
+  console.log(
+    `[settlement-sync] START settlement=${settlementId} source=direct`,
+  );
+
   // Mark as processing to prevent concurrent resolution
   await supabase.from("settlement_events").update({ status: "processing" }).eq("id", eventId);
 
@@ -128,7 +150,9 @@ async function resolveSettlement(
       );
       reconItems = result.items;
     } catch (fetchErr) {
-      console.error(`[settlement-sync] Recon fetch failed for ${settlementId} page ${page}: ${fetchErr instanceof Error ? fetchErr.message : fetchErr}`);
+      const errMsg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+      const isTimeout = errMsg === "PROVIDER_TIMEOUT";
+      console.error(`[settlement-sync] Recon ${isTimeout ? 'TIMEOUT' : 'ERROR'} for ${settlementId} page ${page}: ${errMsg}`);
       errors++;
       break;
     }
@@ -178,6 +202,10 @@ async function resolveSettlement(
       : null,
   }).eq("id", eventId);
 
+  console.log(
+    `[settlement-sync] DONE settlement=${settlementId} settled=${settled} not_found=${notFound} errors=${errors} pages=${page}`,
+  );
+
   return { payment_ids: paymentIds, settled, not_found: notFound, errors };
 }
 
@@ -206,6 +234,13 @@ Deno.serve(async (req: Request) => {
   if (!jwtToken) {
     return new Response(JSON.stringify({ error: "UNAUTHORIZED" }), { status: 401 });
   }
+
+  // Parse optional invocation source from body (for observability)
+  let invocationSource = "manual";
+  try {
+    const body = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    if (body?.source === "pg_cron") invocationSource = "pg_cron";
+  } catch { /* ignore — source is optional */ }
 
   // 3. Service client
   let supabase: ReturnType<typeof createClient>;
@@ -300,15 +335,20 @@ Deno.serve(async (req: Request) => {
 
   const totalSettled = results.reduce((s, r) => s + r.payments_settled, 0);
   const totalErrors = results.reduce((s, r) => s + r.errors, 0);
+  const totalNotFound = results.reduce((s, r) => s + r.payments_not_found, 0);
 
-  console.log(`[settlement-sync] Complete: processed=${results.length} total_settled=${totalSettled} total_errors=${totalErrors}`);
+  console.log(
+    `[settlement-sync] RUN COMPLETE source=${invocationSource} processed=${results.length} settled=${totalSettled} not_found=${totalNotFound} errors=${totalErrors}`,
+  );
 
   return new Response(JSON.stringify({
     success: true,
     provider: "razorpay",
     mode: "SINGLE-MERCHANT RAZORPAY TEST MODE",
+    invocation_source: invocationSource,
     settlements_processed: results.length,
     total_payments_settled: totalSettled,
+    total_payments_not_found: totalNotFound,
     total_errors: totalErrors,
     results,
   }), { status: 200, headers: { "Content-Type": "application/json" } });

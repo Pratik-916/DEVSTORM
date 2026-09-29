@@ -528,7 +528,7 @@ for (const file of frontendFiles) {
 console.log('\n[14] Service Worker Cache Version');
 
 const swContent = fs.readFileSync(path.join(process.cwd(), 'sw.js'), 'utf-8');
-assertContains(swContent, 'cashly-cache-v22', 'SW cache version bumped to v22 for Phase 33');
+assertContains(swContent, 'cashly-cache-v23', 'SW cache version bumped to v23 for Phase 34');
 assertNotContains(swContent, 'cashly-cache-v21', 'Old cache version v21 removed from sw.js');
 
 // ---------------------------------------------------------------------------

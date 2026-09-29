@@ -6,7 +6,7 @@
  * ============================================================
  */
 
-const CACHE_NAME = 'cashly-cache-v22';
+const CACHE_NAME = 'cashly-cache-v23';
 
 const STATIC_ASSETS = [
   '/',

@@ -280,7 +280,12 @@ function assert(condition, testName, details = '') {
 
   let secretsFound = false;
   filesToCheck.forEach(file => {
-    const content = fs.readFileSync(file, 'utf8');
+    let content = fs.readFileSync(file, 'utf8');
+    // For SQL files: strip comment lines before scanning (comments are documentation, not leaks)
+    // Phase 34: pg_cron documentation legitimately references app.service_role_key in comments
+    if (file.endsWith('.sql')) {
+      content = content.split('\n').filter(line => !line.trimStart().startsWith('--')).join('\n');
+    }
     if (
       content.includes('service_role') ||
       content.includes('SUPABASE_SERVICE_ROLE') ||

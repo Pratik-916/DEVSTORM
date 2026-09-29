@@ -548,3 +548,48 @@ CREATE INDEX IF NOT EXISTS idx_settlement_events_pending
 -- Only Edge Functions (service-role) can read/write this table.
 ALTER TABLE public.settlement_events ENABLE ROW LEVEL SECURITY;
 -- No authenticated user policy — settlement_events is exclusively for Edge Functions.
+
+-- ============================================================
+-- PHASE 34: Automated Settlement Sync Scheduling
+-- ============================================================
+--
+-- Supabase supports pg_cron for scheduled Edge Function invocations via
+-- the net extension (pg_net). The cron job below calls provider-settlement-sync
+-- every 4 hours using the service-role key so it bypasses RLS (server-side only).
+--
+-- To enable this schedule, run the following SQL in your Supabase SQL Editor:
+--
+--   SELECT cron.schedule(
+--     'cashly-settlement-sync',
+--     '0 */4 * * *',
+--     $$
+--       SELECT net.http_post(
+--         url := current_setting('app.supabase_url') || '/functions/v1/provider-settlement-sync',
+--         headers := jsonb_build_object(
+--           'Content-Type', 'application/json',
+--           'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+--         ),
+--         body := jsonb_build_object('source', 'pg_cron')
+--       )
+--     $$
+--   );
+--
+-- Required pg_cron configuration:
+--   1. Enable pg_cron extension: Database > Extensions > pg_cron
+--   2. Enable pg_net extension:  Database > Extensions > pg_net
+--   3. Set app.supabase_url and app.service_role_key via:
+--      ALTER DATABASE postgres SET app.supabase_url = 'https://your-project.supabase.co';
+--      ALTER DATABASE postgres SET app.service_role_key = '<service_role_key>';
+--      (The service_role_key is a Supabase project-level secret, not a user secret)
+--
+-- SECURITY: The cron job uses the service-role key ONLY inside the database
+-- (pg_cron/pg_net context). It is never exposed to the frontend.
+--
+-- IDEMPOTENCY: provider-settlement-sync is safe to run at any interval.
+-- It only processes settlement_events with status IN ('pending', 'failed').
+-- Resolved settlements are never re-processed.
+--
+-- PHASE 34: This comment block documents the recommended scheduling approach.
+-- The actual cron.schedule() call is NOT executed here because pg_cron must be
+-- enabled separately via the Supabase Dashboard before the SQL can run.
+

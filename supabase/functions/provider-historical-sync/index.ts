@@ -1,7 +1,8 @@
-﻿/**
+/**
  * provider-historical-sync/index.ts
  * ============================================================
- * Phase 33 — Razorpay Historical Payment Sync Edge Function
+ * Phase 34 — Provider Operations & Deployment Readiness
+ * (Extended from Phase 33 — Razorpay Historical Payment Sync)
  *
  * SINGLE-MERCHANT RAZORPAY TEST MODE ONLY.
  *
@@ -124,19 +125,32 @@ async function fetchRazorpayPayments(
   });
 
   const url = `${RAZORPAY_API_BASE}/payments?${params}`;
-  const resp = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: razorpayAuthHeader(keyId, keySecret),
-      "Content-Type": "application/json",
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: razorpayAuthHeader(keyId, keySecret),
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error("[historical-sync] Razorpay API timeout (>30s)");
+      throw new Error("PROVIDER_TIMEOUT");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!resp.ok) {
-    const errText = await resp.text().catch(() => "");
-    // Safe log: no secrets, only HTTP status
     console.error(`[historical-sync] Razorpay API error: HTTP ${resp.status}`);
-    throw new Error(`Razorpay API returned HTTP ${resp.status}`);
+    throw new Error(`PROVIDER_API_ERROR:${resp.status}`);
   }
 
   const body = await resp.json() as Record<string, unknown>;
@@ -351,6 +365,10 @@ Deno.serve(async (req: Request) => {
   const toTimestamp = Math.floor(Date.now() / 1000);
   const fromTimestamp = toTimestamp - (syncDays * 24 * 60 * 60);
 
+  console.log(
+    `[historical-sync] START merchant=${merchantId.slice(0, 8)}... days=${syncDays} business=${ownership.business_id.slice(0, 8)}...`,
+  );
+
   // 8. Paginated fetch and persist
   const adapter = new RazorpayAdapter();
   let totalInserted = 0;
@@ -407,7 +425,7 @@ Deno.serve(async (req: Request) => {
   }
 
   console.log(
-    `[historical-sync] Complete: pages=${pagesFetched} inserted=${totalInserted} duplicates=${totalDuplicates} failed=${totalFailed} skipped=${totalSkipped}`,
+    `[historical-sync] COMPLETE pages=${pagesFetched} inserted=${totalInserted} duplicates=${totalDuplicates} failed=${totalFailed} skipped=${totalSkipped}`,
   );
 
   // 9. Return summary (no secrets, no PII)

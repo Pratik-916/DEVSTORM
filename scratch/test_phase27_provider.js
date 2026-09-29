@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_phase27_provider.js
  * Cashly Phase 27 � Provider Architecture Test Suite
  * Run with: node scratch/test_phase27_provider.js
@@ -315,8 +315,8 @@ group('Group 24: supabase.js updateFinancialAccount Phase 27 fields', () => {
 });
 
 group('Group 25: SW cache version bump', () => {
-  // Phase 33 bumped SW cache to v22 — v17 through v22 are all valid here
-  assert(swSrc.includes('cashly-cache-v17') || swSrc.includes('cashly-cache-v18') || swSrc.includes('cashly-cache-v19') || swSrc.includes('cashly-cache-v20') || swSrc.includes('cashly-cache-v21') || swSrc.includes('cashly-cache-v22'), 'SW bumped to v17+');
+  // Phase 34 bumped SW cache to v23 - v17 through v23 are all valid here
+  assert(swSrc.includes('cashly-cache-v17') || swSrc.includes('cashly-cache-v18') || swSrc.includes('cashly-cache-v19') || swSrc.includes('cashly-cache-v20') || swSrc.includes('cashly-cache-v21') || swSrc.includes('cashly-cache-v22') || swSrc.includes('cashly-cache-v23'), 'SW bumped to v17+');
 });
 
 console.log(`\n============================`);

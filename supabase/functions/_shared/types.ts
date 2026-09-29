@@ -1,7 +1,8 @@
 /**
  * types.ts
  * ============================================================
- * Phase 32 — Provider Backend Infrastructure
+ * Phase 34 — Provider Operations & Deployment Readiness
+ * (Extended from Phase 32 foundation)
  * Shared types for the Cashly provider Edge Function layer.
  *
  * IMPORTANT: This module MUST NOT import any frontend JS module.
@@ -51,6 +52,8 @@ export const ProviderBackendError = {
   DUPLICATE_TRANSACTION: "DUPLICATE_TRANSACTION",
   DATABASE_FAILURE: "DATABASE_FAILURE",
   INTERNAL_FAILURE: "INTERNAL_FAILURE",
+  PROVIDER_TIMEOUT: "PROVIDER_TIMEOUT",      // Phase 34: provider API timed out
+  PROVIDER_API_ERROR: "PROVIDER_API_ERROR",  // Phase 34: provider returned non-2xx
 } as const;
 
 export type ProviderBackendErrorValue = (typeof ProviderBackendError)[keyof typeof ProviderBackendError];

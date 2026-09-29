@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_phase26_persistence.js
  * ============================================================
  * Cashly Phase 26 Audit Suite: Persistent Cashflow Action History
@@ -290,8 +290,8 @@ assert(supabaseSrc.includes("upsert([row], { onConflict: 'id' })"), 'upsertActio
 assert(supabaseSrc.includes('return { success: true }'), 'upsertActionTask returns success:true on success');
 assert(supabaseSrc.includes('return { success: false, error:'), 'upsertActionTask returns success:false on failure');
 const swSrc = fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8');
-// Phase 33 bumped SW cache to v22 — v17 through v22 are all valid here
-assert(swSrc.includes('cashly-cache-v17') || swSrc.includes('cashly-cache-v18') || swSrc.includes('cashly-cache-v19') || swSrc.includes('cashly-cache-v20') || swSrc.includes('cashly-cache-v21') || swSrc.includes('cashly-cache-v22'), 'sw.js has v17+ cache (v22 valid after Phase 33 bump)');
+// Phase 34 bumped SW cache to v23 - v17 through v23 are all valid here
+assert(swSrc.includes('cashly-cache-v17') || swSrc.includes('cashly-cache-v18') || swSrc.includes('cashly-cache-v19') || swSrc.includes('cashly-cache-v20') || swSrc.includes('cashly-cache-v21') || swSrc.includes('cashly-cache-v22') || swSrc.includes('cashly-cache-v23'), 'sw.js has v17+ cache (v23 valid after Phase 34 bump)');
 assert(!swSrc.includes('cashly-cache-v15'), 'sw.js no longer uses v15');
 console.log('  [INFO] Full real Supabase verification requires authenticated browser session.');
 console.log('  [INFO] See walkthrough.md for manual verification procedure.');
