@@ -1,4 +1,4 @@
-﻿/**
+/**
  * types.ts
  * ============================================================
  * Phase 32 — Provider Backend Infrastructure
@@ -129,8 +129,13 @@ export interface IProviderAdapter {
   /**
    * Parse and classify the raw webhook payload.
    * Called ONLY after verifyWebhook() returns true.
+   *
+   * headers: Optional request headers. Some providers (e.g. Razorpay) supply
+   * the idempotency event_id in a header (x-razorpay-event-id) rather than
+   * in the JSON body. Adapters that need header-derived data should use this.
    */
-  parseWebhook(rawBody: string): Promise<ParsedWebhookEvent>;
+  parseWebhook(rawBody: string, headers?: Record<string, string>): Promise<ParsedWebhookEvent>;
+
 
   /**
    * Normalize a single raw provider transaction.

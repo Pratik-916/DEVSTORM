@@ -1,4 +1,4 @@
-﻿/**
+/**
  * mock_adapter.ts
  * ============================================================
  * Phase 32 — Provider Backend Infrastructure
@@ -119,7 +119,7 @@ export class MockProviderAdapter implements IProviderAdapter {
    *   "data": { ... }
    * }
    */
-  async parseWebhook(rawBody: string): Promise<ParsedWebhookEvent> {
+  async parseWebhook(rawBody: string, _headers?: Record<string, string>): Promise<ParsedWebhookEvent> {
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(rawBody);

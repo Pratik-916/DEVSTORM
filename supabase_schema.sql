@@ -479,3 +479,72 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_provider_unique
 CREATE INDEX IF NOT EXISTS idx_financial_accounts_provider_lookup
     ON public.financial_accounts (provider, provider_account_id)
     WHERE provider_account_id IS NOT NULL;
+
+-- ============================================================
+-- PHASE 33: RAZORPAY TEST MODE — SINGLE-MERCHANT PROVIDER COLUMNS
+-- ============================================================
+
+-- Add provider_account_id to financial_accounts for canonical provider identity.
+-- Used by Edge Functions to resolve business ownership from a Razorpay webhook.
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS provider_account_id TEXT;
+
+-- Supporting descriptive columns for provider account metadata.
+ALTER TABLE public.financial_accounts
+ADD COLUMN IF NOT EXISTS institution_name TEXT,
+ADD COLUMN IF NOT EXISTS account_type TEXT,
+ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'INR',
+ADD COLUMN IF NOT EXISTS metadata JSONB;
+
+-- Phase 33 financial account provider lookup index (composite).
+-- Ensures resolveBusinessId() in Edge Functions is fast.
+CREATE INDEX IF NOT EXISTS idx_financial_accounts_provider_account
+    ON public.financial_accounts (provider, provider_account_id)
+    WHERE provider_account_id IS NOT NULL;
+
+-- PHASE 33: SETTLEMENT EVENTS TABLE
+-- Purpose: Records settlement.processed webhook deliveries so the
+-- provider-settlement-sync Edge Function can later resolve the constituent
+-- payment IDs via Razorpay's settlement recon API.
+--
+-- Design rationale (CRITICAL):
+--   Razorpay's settlement.processed webhook does NOT list payment IDs.
+--   A separate API call to GET /v1/settlements/recon/combined is required
+--   to map settlement_id -> payment_ids -> Cashly transaction records.
+--   This table bridges the webhook event and the async resolution step.
+--
+-- This is NOT the financial ledger — transactions table remains canonical.
+CREATE TABLE IF NOT EXISTS public.settlement_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- Provider that delivered the settlement event
+    provider TEXT NOT NULL,
+    -- Razorpay settlement ID (e.g. setl_xxxx)
+    settlement_id TEXT NOT NULL,
+    -- Total settlement amount in INR (paise / 100 at receive time)
+    amount NUMERIC NOT NULL,
+    -- UTR — Unique Transaction Reference for bank reconciliation
+    utr TEXT,
+    -- Processing lifecycle
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'processing', 'resolved', 'failed')),
+    -- UTC timestamp when the settlement webhook was received
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- UTC timestamp when payment-level resolution was completed
+    resolved_at TIMESTAMPTZ,
+    -- How many payments were updated to 'settled' during resolution
+    payments_settled INTEGER,
+    -- Safe error summary if resolution failed
+    error_details TEXT,
+    -- The business this settlement belongs to (server-resolved)
+    business_id UUID REFERENCES public.businesses(id) ON DELETE CASCADE,
+    CONSTRAINT unique_settlement_event UNIQUE (provider, settlement_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_settlement_events_pending
+    ON public.settlement_events (provider, status, received_at)
+    WHERE status IN ('pending', 'failed');
+
+-- Enable RLS on settlement_events.
+-- Only Edge Functions (service-role) can read/write this table.
+ALTER TABLE public.settlement_events ENABLE ROW LEVEL SECURITY;
+-- No authenticated user policy — settlement_events is exclusively for Edge Functions.

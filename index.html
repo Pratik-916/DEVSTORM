@@ -1818,7 +1818,7 @@
 
     <div class="modal" style="max-width:460px;">
 
-      <!-- ---- SCREEN 1: Select Demo Account ---- -->
+      <!-- ---- SCREEN 1: Select Account (Phase 33: Razorpay + Demo) ---- -->
       <div id="connect-screen-select">
         <div class="modal-header">
           <h2 class="modal-title" id="connect-select-title">Connect Account</h2>
@@ -1832,10 +1832,35 @@
         </div>
         <div class="modal-body">
           <p style="font-size:var(--text-sm);color:var(--c-text-secondary);margin-bottom:var(--sp-4);">
-            Select a financial account to simulate importing live digital transactions.
+            Select a financial account to import your digital transactions.
           </p>
 
-          <div class="account-select-card" tabindex="0" role="button" aria-label="Selected Demo Feed">
+          <!-- Razorpay Test Account (Phase 33 — Single-Merchant Test Mode) -->
+          <div class="account-select-card" id="connect-card-razorpay" tabindex="0" role="button"
+            aria-label="Connect Razorpay Test Account" data-provider="razorpay"
+            style="border:2px solid var(--c-primary,#6366f1);margin-bottom:var(--sp-3);">
+            <div class="account-select-icon" aria-hidden="true"
+              style="background:var(--c-primary-light,#ede9fe);color:var(--c-primary,#6366f1);">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <line x1="2" x2="22" y1="10" y2="10" />
+              </svg>
+            </div>
+            <div style="flex:1;">
+              <p style="font-size:var(--text-base);font-weight:var(--fw-semibold);color:var(--c-text-primary);">
+                Razorpay Payment Account
+              </p>
+              <p style="font-size:var(--text-xs);color:var(--c-text-secondary);margin-top:2px;">
+                Import UPI, Card &amp; Netbanking payments · Razorpay Test Mode
+              </p>
+            </div>
+            <span class="badge" style="font-size:10px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;">Test Mode</span>
+          </div>
+
+          <!-- Demo Sandbox (existing) -->
+          <div class="account-select-card" id="connect-card-demo" tabindex="0" role="button"
+            aria-label="Select Demo Feed" data-provider="demo">
             <div class="account-select-icon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1855,7 +1880,7 @@
                 Includes PhonePe QR, POS Terminal &amp; NetBanking
               </p>
             </div>
-            <span class="badge badge-settled" style="font-size:10px;">Ready</span>
+            <span class="badge badge-settled" style="font-size:10px;">Demo</span>
           </div>
 
           <div
@@ -1867,7 +1892,7 @@
               <line x1="12" x2="12" y1="8" y2="12" />
               <line x1="12" x2="12.01" y1="16" y2="16" />
             </svg>
-            <p style="font-size:var(--text-xs);color:var(--c-text-secondary);line-height:1.4;">
+            <p style="font-size:var(--text-xs);color:var(--c-text-secondary);line-height:1.4;" id="connect-info-text">
               <strong>Demo Sandbox:</strong> This simulates a financial feed. No real bank credentials or external APIs
               are connected.
             </p>
@@ -1875,12 +1900,12 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-primary btn-lg btn-full" id="btn-connect-continue">
-            Continue to Consent
+            Continue to Confirm Access
           </button>
         </div>
       </div>
 
-      <!-- ---- SCREEN 2: Consent ---- -->
+      <!-- ---- SCREEN 2: Access Confirmation ---- -->
       <div id="connect-screen-consent" class="hidden">
         <div class="modal-header">
           <button class="modal-close" id="btn-consent-back" aria-label="Go back" style="margin-right:var(--sp-2);">
@@ -1889,7 +1914,7 @@
               <path d="m15 18-6-6 6-6" />
             </svg>
           </button>
-          <h2 class="modal-title" style="flex:1;">Data Sharing Consent</h2>
+          <h2 class="modal-title" style="flex:1;" id="connect-consent-title">Access Confirmation</h2>
           <button class="modal-close" id="connect-consent-close" aria-label="Close">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1899,34 +1924,71 @@
           </button>
         </div>
         <div class="modal-body">
-          <div class="consent-box">
-            <p class="consent-title">Permissions Requested by Cashly Demo</p>
-            <div class="consent-list">
-              <div class="consent-item">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Read-only access to incoming UPI, POS card, and bank transactions</span>
+          <!-- Razorpay consent content -->
+          <div id="consent-content-razorpay" class="hidden">
+            <div class="consent-box">
+              <p class="consent-title">Connect Razorpay Test Account</p>
+              <div class="consent-list">
+                <div class="consent-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Read-only access to Razorpay payment history (UPI, Card, Netbanking)</span>
+                </div>
+                <div class="consent-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Payment amounts, dates, and payment method — no customer PII stored</span>
+                </div>
+                <div class="consent-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Pending settlement tracking · Auto-import of new captured payments</span>
+                </div>
               </div>
-              <div class="consent-item">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Automatic tracking of 1-2 day pending settlements</span>
-              </div>
-              <div class="consent-item">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Background auto-sync for real-time cash position updates</span>
-              </div>
+              <p class="consent-disclaimer">
+                <strong>Test Mode only.</strong> Razorpay API credentials are configured server-side.
+                No Key Secret is entered in this browser. Read-only &mdash; no funds can be moved.
+                Single-Merchant Razorpay Test Mode.
+              </p>
             </div>
-            <p class="consent-disclaimer">
-              Simulated sandbox environment. Read-only permissions only. No funds can be moved.
-            </p>
+          </div>
+          <!-- Demo consent content (existing) -->
+          <div id="consent-content-demo">
+            <div class="consent-box">
+              <p class="consent-title">Permissions Requested by Cashly Demo</p>
+              <div class="consent-list">
+                <div class="consent-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Read-only access to incoming UPI, POS card, and bank transactions</span>
+                </div>
+                <div class="consent-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Automatic tracking of 1-2 day pending settlements</span>
+                </div>
+                <div class="consent-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Background auto-sync for real-time cash position updates</span>
+                </div>
+              </div>
+              <p class="consent-disclaimer">
+                Simulated sandbox environment. Read-only permissions only. No funds can be moved.
+              </p>
+            </div>
           </div>
         </div>
         <div class="modal-footer" style="display:flex;gap:var(--sp-3);">
@@ -1979,7 +2041,7 @@
               id="connected-imported-count">
               5 digital transactions imported
             </p>
-            <p
+            <p id="connected-description"
               style="font-size:var(--text-sm);color:var(--c-text-secondary);line-height:1.5;max-width:320px;margin-bottom:var(--sp-4);">
               Your UPI, Card, and Bank feeds are now active with <strong>Auto Sync: ON</strong>. Dashboard and activity
               feeds have been updated.
@@ -1993,9 +2055,46 @@
         </div>
       </div>
 
+      <!-- ---- SCREEN 5: Connection Error ---- -->
+      <div id="connect-screen-error" class="hidden">
+        <div class="modal-header" style="border-bottom:none;">
+          <div style="flex:1;"></div>
+          <button class="modal-close" id="connect-error-close" aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" x2="6" y1="6" y2="18" />
+              <line x1="6" x2="18" y1="6" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body" style="padding-top:0;">
+          <div class="connected-container">
+            <div class="connected-icon-wrap" aria-hidden="true"
+              style="background:#fef2f2;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#dc2626"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" x2="6" y1="6" y2="18" />
+                <line x1="6" x2="18" y1="6" y2="18" />
+              </svg>
+            </div>
+            <h3 style="font-size:var(--text-xl);font-weight:var(--fw-bold);color:var(--c-text-primary);margin-bottom:var(--sp-1);">
+              Connection Failed
+            </h3>
+            <p id="connect-error-message"
+              style="font-size:var(--text-sm);color:var(--c-text-secondary);line-height:1.5;max-width:320px;margin-bottom:var(--sp-4);">
+              Could not connect the account. Please try again.
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:var(--sp-3);">
+          <button class="btn btn-ghost btn-lg" id="btn-error-back" style="flex:1;">Go Back</button>
+          <button class="btn btn-primary btn-lg" id="btn-error-retry" style="flex:1;">Try Again</button>
+        </div>
+      </div>
+
     </div>
   </div>
-  <!-- /CONNECT ACCOUNT DEMO MODAL -->
+  <!-- /CONNECT ACCOUNT MODAL -->
 
   <!-- ============================================================
      ADMIN MODAL: ADD / EDIT TRANSACTION
