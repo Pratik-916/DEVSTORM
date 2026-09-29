@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_phase33_razorpay.js
  * ============================================================
  * Phase 33 — Razorpay Test Mode Integration Test Suite
@@ -641,6 +641,33 @@ assertContains(htmlContent, 'consent-content-razorpay', 'Razorpay-specific conse
 assertContains(htmlContent, 'No Key Secret is entered in this browser', 'Security disclaimer in Razorpay consent');
 assertContains(htmlContent, 'Single-Merchant Razorpay Test Mode', 'Single-merchant disclaimer in HTML');
 
+
+// ---------------------------------------------------------------------------
+// SECTION 21: Settlement Pipeline Integration -- Webhook to settlement_events to sync
+// ---------------------------------------------------------------------------
+
+console.log('\n[21] Settlement Pipeline Integration');
+
+const wbhkContent = fs.readFileSync(
+  path.join(process.cwd(), 'supabase/functions/provider-webhook/index.ts'), 'utf-8'
+);
+const stlContent = fs.readFileSync(
+  path.join(process.cwd(), 'supabase/functions/provider-settlement-sync/index.ts'), 'utf-8'
+);
+
+assertContains(wbhkContent, 'settlement_events', 'Webhook handler references settlement_events table');
+assertContains(wbhkContent, '.insert({', 'Webhook handler calls .insert() in recordSettlementEvent');
+assertNotContains(wbhkContent, 'placeholder in Phase 33', 'recordSettlementEvent is not a stub');
+assertContains(wbhkContent, 'settlement_id: settlementId', 'settlement_id field inserted by webhook');
+assertContains(wbhkContent, 'amountINR', 'Amount converted to INR before settlement_events insert');
+assertContains(wbhkContent, '23505', 'Duplicate settlement delivery handled idempotently (23505)');
+assertContains(stlContent, 'settlement_events', 'settlement-sync queries settlement_events table');
+assertContains(stlContent, 'settlements/recon/combined', 'Correct Razorpay recon API endpoint used');
+assertContains(stlContent, 'entity_id', 'Payment entity_id extracted from recon response');
+assertContains(stlContent, 'provider_transaction_id', 'Settlement matched by exact provider_transaction_id');
+assertContains(stlContent, 'business_id', 'Tenant isolation enforced in settlement status update');
+assertContains(stlContent, 'processing', 'Settlement event marked processing during resolution');
+assertContains(stlContent, 'resolved', 'Settlement event marked resolved on success');
 // ---------------------------------------------------------------------------
 // RESULTS
 // ---------------------------------------------------------------------------

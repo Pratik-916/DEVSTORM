@@ -27,10 +27,11 @@ const suites = [
   { phase: 30, file: 'scratch/test_phase30_operations.js' },
   { phase: 31, file: 'scratch/test_phase31_security.js' },
   { phase: 32, file: 'scratch/test_phase32_backend.js' },
+  { phase: 33, file: 'scratch/test_phase33_razorpay.js' },
 ];
 
 console.log('======================================================');
-console.log('RUNNING ALL PHASE 9 - PHASE 28 REGRESSION SUITES');
+console.log('RUNNING ALL PHASE 9 - PHASE 33 REGRESSION SUITES');
 console.log('======================================================');
 
 const results = [];

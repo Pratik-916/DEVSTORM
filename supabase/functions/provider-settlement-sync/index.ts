@@ -4,8 +4,8 @@
  * Phase 33 — Razorpay Settlement Sync Edge Function
  *
  * SINGLE-MERCHANT RAZORPAY TEST MODE ONLY.
- *
- * Purpose:
+ *  
+ * 
  *   Resolve pending settlement_events records into per-payment settlement_status
  *   updates in the transactions table.
  *

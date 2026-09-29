@@ -1,4 +1,4 @@
-﻿/**
+/**
  * provider-webhook/index.ts
  * ============================================================
  * Phase 33 — Secure Provider Webhook Edge Function
@@ -221,14 +221,36 @@ async function recordSettlementEvent(
   provider: string,
   business_id: string,
 ): Promise<void> {
-  // Log into webhook_events is already done by the main handler.
-  // The settlement sync job reads pending settlement events from webhook_events
-  // and calls the Razorpay API to resolve constituent payment IDs.
-  // This function is a placeholder in Phase 33 — the sync is triggered manually
-  // or by a scheduled Edge Function in Phase 34.
-  console.log(
-    `[webhook] Settlement received: id=${settlementId} amount_paise=${settlementAmountPaise} utr=${utr} provider=${provider} business=${business_id}`,
-  );
+  if (!settlementId) {
+    console.warn("[webhook] settlement.processed received with no settlement ID — skipping insert");
+    return;
+  }
+
+  const amountINR = settlementAmountPaise / 100;
+
+  // Insert into settlement_events so provider-settlement-sync can pick it up.
+  // ON CONFLICT on (provider, settlement_id) is handled by the unique constraint — idempotent.
+  const { error } = await supabase.from("settlement_events").insert({
+    provider,
+    settlement_id: settlementId,
+    amount: amountINR,
+    utr: utr || null,
+    status: "pending",
+    business_id,
+    received_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      // Duplicate — already recorded (idempotent re-delivery), safe to ignore
+      console.log(`[webhook] Settlement ${settlementId} already in settlement_events (duplicate delivery)`);
+    } else {
+      // Non-fatal: log and continue — webhook is acknowledged 200 to avoid Razorpay retries
+      console.error(`[webhook] Failed to insert settlement_event for ${settlementId}: code=${error.code}`);
+    }
+  } else {
+    console.log(`[webhook] Settlement ${settlementId} recorded: amount_inr=${amountINR} utr=${utr || "none"} business=${business_id}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
