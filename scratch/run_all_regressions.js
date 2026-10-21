@@ -30,6 +30,7 @@ const suites = [
   { phase: 33, file: 'scratch/test_phase33_razorpay.js' },
   { phase: 34, file: 'scratch/test_phase34_operations.js' },
   { phase: 35, file: 'scratch/test_phase35_deployment.js' },
+  { phase: 35, file: 'scratch/test_phase35_security.js' },
 ];
 
 console.log('======================================================');

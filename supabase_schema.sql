@@ -559,31 +559,29 @@ ALTER TABLE public.settlement_events ENABLE ROW LEVEL SECURITY;
 --
 -- To enable this schedule, run the following SQL in your Supabase SQL Editor:
 --
---   SELECT cron.schedule(
---     'cashly-settlement-sync',
---     '0 */4 * * *',
---     $$
---       SELECT net.http_post(
---         url := current_setting('app.supabase_url') || '/functions/v1/provider-settlement-sync',
---         headers := jsonb_build_object(
---           'Content-Type', 'application/json',
---           'Authorization', 'Bearer ' || current_setting('app.service_role_key')
---         ),
---         body := jsonb_build_object('source', 'pg_cron')
---       )
---     $$
---   );
+--   1. Enable extensions: pg_cron, pg_net, supabase_vault
+--   2. Store cron secret in Vault:
+--      SELECT vault.create_secret('YOUR_CRON_SECRET', 'settlement_sync_cron_secret', 'Dedicated secret for cron settlement sync');
+--   3. Set SETTLEMENT_SYNC_CRON_SECRET in Supabase Edge Functions:
+--      supabase secrets set SETTLEMENT_SYNC_CRON_SECRET="YOUR_CRON_SECRET"
+--   4. Register cron schedule:
+--      SELECT cron.schedule(
+--        'cashly-settlement-sync',
+--        '0 */4 * * *',
+--        $$
+--          SELECT net.http_post(
+--            url := 'https://your-project.supabase.co/functions/v1/provider-settlement-sync',
+--            headers := jsonb_build_object(
+--              'Content-Type', 'application/json',
+--              'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'settlement_sync_cron_secret' LIMIT 1)
+--            ),
+--            body := jsonb_build_object('source', 'pg_cron')
+--          )
+--        $$
+--      );
 --
--- Required pg_cron configuration:
---   1. Enable pg_cron extension: Database > Extensions > pg_cron
---   2. Enable pg_net extension:  Database > Extensions > pg_net
---   3. Set app.supabase_url and app.service_role_key via:
---      ALTER DATABASE postgres SET app.supabase_url = 'https://your-project.supabase.co';
---      ALTER DATABASE postgres SET app.service_role_key = '<service_role_key>';
---      (The service_role_key is a Supabase project-level secret, not a user secret)
---
--- SECURITY: The cron job uses the service-role key ONLY inside the database
--- (pg_cron/pg_net context). It is never exposed to the frontend.
+-- SECURITY: The cron job uses the vault secret ONLY inside the database
+-- (pg_cron/pg_net context). It is never exposed to the frontend or in SQL text.
 --
 -- IDEMPOTENCY: provider-settlement-sync is safe to run at any interval.
 -- It only processes settlement_events with status IN ('pending', 'failed').

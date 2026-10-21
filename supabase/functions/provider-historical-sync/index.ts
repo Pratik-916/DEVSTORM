@@ -346,7 +346,14 @@ Deno.serve(async (req: Request) => {
     await ensureFinancialAccount(supabase, merchantId, business_id);
     ownership = { business_id, user_id: user.id };
   } else {
-    // Existing account: update last_synced_at
+    // Existing account: verify caller owns this business before allowing sync
+    if (ownership.user_id && ownership.user_id !== user.id) {
+      console.warn(`[historical-sync] User ${user.id} unauthorized access attempt to business ${ownership.business_id}`);
+      return new Response(JSON.stringify({ error: "FORBIDDEN", message: "User does not own this business" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     await ensureFinancialAccount(supabase, merchantId, ownership.business_id);
   }
 

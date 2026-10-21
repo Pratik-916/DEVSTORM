@@ -1,4 +1,4 @@
-﻿# Cashly — Razorpay Test Mode Deployment Guide
+# Cashly — Razorpay Test Mode Deployment Guide
 ## Phase 34: Provider Operations & Live Verification
 
 > **SINGLE-MERCHANT RAZORPAY TEST MODE ONLY**
@@ -89,11 +89,16 @@ Settlement sync runs every 4 hours automatically via pg_cron.
 1. **Enable extensions** in Supabase Dashboard → Database → Extensions:
    - `pg_cron`
    - `pg_net`
+   - `supabase_vault`
 
-2. **Set database-level config** in SQL Editor:
+2. **Configure secret in Vault and Edge Functions**:
+   Store the cron secret securely in Supabase Vault:
 ```sql
-ALTER DATABASE postgres SET app.supabase_url = 'https://your-project.supabase.co';
-ALTER DATABASE postgres SET app.service_role_key = '<your-service-role-key>';
+SELECT vault.create_secret('YOUR_CRON_SECRET', 'settlement_sync_cron_secret', 'Dedicated secret for cron settlement sync');
+```
+   And configure the matching secret in Edge Functions:
+```bash
+supabase secrets set SETTLEMENT_SYNC_CRON_SECRET="YOUR_CRON_SECRET"
 ```
 
 3. **Register the cron job**:
@@ -103,10 +108,10 @@ SELECT cron.schedule(
   '0 */4 * * *',
   $$
     SELECT net.http_post(
-      url := current_setting('app.supabase_url') || '/functions/v1/provider-settlement-sync',
+      url := 'https://your-project.supabase.co/functions/v1/provider-settlement-sync',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+        'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'settlement_sync_cron_secret' LIMIT 1)
       ),
       body := jsonb_build_object('source', 'pg_cron')
     )

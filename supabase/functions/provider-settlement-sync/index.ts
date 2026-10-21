@@ -215,62 +215,86 @@ async function resolveSettlement(
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "METHOD_NOT_ALLOWED" }), { status: 405 });
+    return new Response(JSON.stringify({ error: "METHOD_NOT_ALLOWED" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
-  // 1. Load credentials from Deno.env — NEVER from request
-  const keyId = Deno.env.get("RAZORPAY_KEY_ID");
-  const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
-  const merchantId = Deno.env.get("RAZORPAY_MERCHANT_ID");
-
-  if (!keyId || !keySecret || !merchantId) {
-    console.error("[settlement-sync] Razorpay credentials not fully configured in Deno.env");
-    return new Response(JSON.stringify({ error: ProviderBackendError.INTERNAL_FAILURE }), { status: 500 });
-  }
-
-  // 2. Authenticate caller
+  // 1. Authenticate caller FIRST (defense-in-depth since verify_jwt is false)
   const authHeader = req.headers.get("Authorization") ?? "";
   const jwtToken = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!jwtToken) {
-    return new Response(JSON.stringify({ error: "UNAUTHORIZED" }), { status: 401 });
+    return new Response(JSON.stringify({ error: "UNAUTHORIZED" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const cronSecret = Deno.env.get("SETTLEMENT_SYNC_CRON_SECRET") ?? "";
+  const isCronInvocation = (Boolean(serviceRoleKey) && jwtToken === serviceRoleKey) ||
+                           (Boolean(cronSecret) && jwtToken === cronSecret);
+
   // Parse optional invocation source from body (for observability)
-  let invocationSource = "manual";
+  let invocationSource = isCronInvocation ? "pg_cron" : "manual";
   try {
     const body = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
-    if (body?.source === "pg_cron") invocationSource = "pg_cron";
+    if (body?.source === "pg_cron" && isCronInvocation) invocationSource = "pg_cron";
   } catch { /* ignore — source is optional */ }
 
-  // 3. Service client
+  // 2. Service client (server-side only)
   let supabase: ReturnType<typeof createClient>;
   try {
     supabase = getSupabaseServiceClient();
   } catch {
-    return new Response(JSON.stringify({ error: ProviderBackendError.INTERNAL_FAILURE }), { status: 500 });
+    return new Response(JSON.stringify({ error: ProviderBackendError.INTERNAL_FAILURE }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
-  // 4. Verify JWT (unless cron using service-role key directly)
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const isCronInvocation = jwtToken === serviceRoleKey;
-
+  // 3. User verification and tenant isolation (when not invoked by system cron)
+  let callerBusinessId: string | null = null;
   if (!isCronInvocation) {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!anonKey) {
-      return new Response(JSON.stringify({ error: ProviderBackendError.INTERNAL_FAILURE }), { status: 500 });
+      return new Response(JSON.stringify({ error: ProviderBackendError.INTERNAL_FAILURE }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
     if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "UNAUTHORIZED" }), { status: 401 });
+      return new Response(JSON.stringify({ error: "UNAUTHORIZED" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
     }
+
+    // Resolve caller's business to ensure strict tenant isolation
+    const { data: bizData, error: bizErr } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("owner_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (bizErr || !bizData) {
+      return new Response(JSON.stringify({ error: "FORBIDDEN", message: "User has no associated business" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    callerBusinessId = bizData.id as string;
   }
 
-  // 5. Fetch pending settlement_events for Razorpay
-  const { data: pendingEvents, error: fetchErr } = await supabase
+  // 4. Fetch pending settlement_events for Razorpay
+  let query = supabase
     .from("settlement_events")
     .select("id, settlement_id, business_id, amount, utr")
     .eq("provider", "razorpay")
@@ -278,9 +302,19 @@ Deno.serve(async (req: Request) => {
     .order("received_at", { ascending: true })
     .limit(MAX_SETTLEMENTS_PER_RUN);
 
+  // Enforce tenant boundary for user-triggered invocations
+  if (!isCronInvocation && callerBusinessId) {
+    query = query.eq("business_id", callerBusinessId);
+  }
+
+  const { data: pendingEvents, error: fetchErr } = await query;
+
   if (fetchErr) {
     console.error(`[settlement-sync] Failed to fetch pending events: ${fetchErr.message}`);
-    return new Response(JSON.stringify({ error: ProviderBackendError.INTERNAL_FAILURE }), { status: 500 });
+    return new Response(JSON.stringify({ error: ProviderBackendError.INTERNAL_FAILURE }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   if (!pendingEvents || pendingEvents.length === 0) {
@@ -289,7 +323,21 @@ Deno.serve(async (req: Request) => {
       provider: "razorpay",
       message: "No pending settlement events to process",
       settlements_processed: 0,
+      invocation_source: invocationSource,
     }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  // 5. Load credentials from Deno.env ONLY when pending settlements actually exist to be processed
+  const keyId = Deno.env.get("RAZORPAY_KEY_ID");
+  const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
+  const merchantId = Deno.env.get("RAZORPAY_MERCHANT_ID");
+
+  if (!keyId || !keySecret || !merchantId) {
+    console.error("[settlement-sync] Razorpay credentials not fully configured in Deno.env to process settlements");
+    return new Response(JSON.stringify({
+      error: ProviderBackendError.INTERNAL_FAILURE,
+      message: "Provider credentials not configured",
+    }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 
   // 6. Process each pending settlement
