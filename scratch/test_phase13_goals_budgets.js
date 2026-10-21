@@ -140,13 +140,20 @@ global.SupabaseService = {
   },
 };
 
+const _now = new Date();
+const _year = _now.getFullYear();
+const _month = String(_now.getMonth() + 1).padStart(2, '0');
+const _monthPrefix = `${_year}-${_month}`;
+const _pastDate = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+const _futureTargetDate = new Date(Date.now() + 20 * 86400000).toISOString().split('T')[0];
+
 // Mock AppState
 const initialTransactions = [
-  { id: 't1', type: 'sale', amount: 20000, category: 'sales', settlementStatus: 'settled', date: '2026-09-02' },
-  { id: 't2', type: 'sale', amount: 5000, category: 'sales', settlementStatus: 'pending', date: '2026-09-05' },
-  { id: 't3', type: 'expense', amount: 3000, category: 'stock', settlementStatus: 'settled', date: '2026-09-04' },
-  { id: 't4', type: 'expense', amount: 1500, category: 'utilities', settlementStatus: 'settled', date: '2026-09-06' },
-  { id: 't5', type: 'expense', amount: 4000, category: 'supplier', settlementStatus: 'settled', date: '2026-09-08' },
+  { id: 't1', type: 'sale', amount: 20000, category: 'sales', settlementStatus: 'settled', date: `${_monthPrefix}-02` },
+  { id: 't2', type: 'sale', amount: 5000, category: 'sales', settlementStatus: 'pending', date: `${_monthPrefix}-05` },
+  { id: 't3', type: 'expense', amount: 3000, category: 'stock', settlementStatus: 'settled', date: `${_monthPrefix}-04` },
+  { id: 't4', type: 'expense', amount: 1500, category: 'utilities', settlementStatus: 'settled', date: `${_monthPrefix}-06` },
+  { id: 't5', type: 'expense', amount: 4000, category: 'supplier', settlementStatus: 'settled', date: `${_monthPrefix}-08` },
 ];
 
 let currentTransactions = JSON.parse(JSON.stringify(initialTransactions));
@@ -162,8 +169,8 @@ let mockSummary = {
 global.AppState = {
   getTransactions: () => currentTransactions,
   getPayments: () => [
-    { id: 'p1', title: 'Rent', amount: 3000, dueDate: '2026-09-25', status: 'due', priority: 'essential' },
-    { id: 'p2', title: 'Power', amount: 1000, dueDate: '2026-09-28', status: 'due', priority: 'normal' },
+    { id: 'p1', title: 'Rent', amount: 3000, dueDate: `${_monthPrefix}-25`, status: 'due', priority: 'essential' },
+    { id: 'p2', title: 'Power', amount: 1000, dueDate: `${_monthPrefix}-28`, status: 'due', priority: 'normal' },
   ],
   getFinancialAccounts: () => [{ id: 'acc1', accountName: 'Main Account', balance: 22000 }],
   getSummary: () => mockSummary,
@@ -192,7 +199,7 @@ async function runTests() {
     title: 'Maintain ₹30,000 Cash Target',
     goal_type: 'cash_target',
     target_amount: 30000,
-    target_date: '2026-10-15',
+    target_date: _futureTargetDate,
   });
   assert(goalCashRes && !goalCashRes.error, 'Test A: Cash target goal created without errors');
   const activeGoals = BusinessGoalsEngine.getActiveGoals();
@@ -207,10 +214,10 @@ async function runTests() {
 
   // Test C: Sales target -> correct sales period calculation (settled sales only)
   const goalSalesRes = await BusinessGoalsEngine.createGoal({
-    title: 'September Sales Target',
+    title: 'Current Month Sales Target',
     goal_type: 'sales_target',
     target_amount: 25000,
-    target_date: '2026-09-30',
+    target_date: `${_monthPrefix}-28`,
   });
   assert(goalSalesRes && !goalSalesRes.error, 'Test C: Sales target goal created');
   const salesGoal = BusinessGoalsEngine.getActiveGoals().find(g => g.goalType === 'sales_target');
@@ -221,10 +228,10 @@ async function runTests() {
 
   // Test D: Expense limit -> correct spending
   const goalExpRes = await BusinessGoalsEngine.createGoal({
-    title: 'September Expense Limit',
+    title: 'Current Month Expense Limit',
     goal_type: 'expense_limit',
     target_amount: 10000,
-    target_date: '2026-09-30',
+    target_date: `${_monthPrefix}-28`,
   });
   assert(goalExpRes && !goalExpRes.error, 'Test D: Expense limit goal created');
   const expGoal = BusinessGoalsEngine.getActiveGoals().find(g => g.goalType === 'expense_limit');
@@ -263,12 +270,12 @@ async function runTests() {
   // Test G: Goal deadline -> correct status
   // 1. Overdue test: target date in the past, target not reached
   const overdueGoalRes = await BusinessGoalsEngine.createGoal({
-    title: 'Old August Target',
+    title: 'Old Target',
     goal_type: 'cash_target',
     target_amount: 50000,
-    target_date: '2026-08-15', // past
+    target_date: _pastDate, // past
   });
-  const overdueGoal = BusinessGoalsEngine.getActiveGoals().find(g => g.title === 'Old August Target');
+  const overdueGoal = BusinessGoalsEngine.getActiveGoals().find(g => g.title === 'Old Target');
   const overdueProg = BusinessGoalsEngine.calculateProgress(overdueGoal);
   assert(overdueProg.status === 'Overdue', `Test G: Past target date evaluated as 'Overdue' (got '${overdueProg.status}')`);
 
@@ -277,7 +284,7 @@ async function runTests() {
     title: 'Reserve Buffer ₹10,000',
     goal_type: 'savings_target',
     target_amount: 10000, // Available safe cash is 15,000 >= 10,000
-    target_date: '2026-10-30',
+    target_date: _futureTargetDate,
   });
   const completedGoal = BusinessGoalsEngine.getActiveGoals().find(g => g.title === 'Reserve Buffer ₹10,000');
   const completedProg = BusinessGoalsEngine.calculateProgress(completedGoal);
@@ -289,7 +296,7 @@ async function runTests() {
     title: 'Reach ₹150,000 Cash',
     goal_type: 'cash_target',
     target_amount: 150000,
-    target_date: '2026-09-30',
+    target_date: _futureTargetDate,
   });
   const highGoal = BusinessGoalsEngine.getActiveGoals().find(g => g.title === 'Reach ₹150,000 Cash');
   const highProg = BusinessGoalsEngine.calculateProgress(highGoal);
